@@ -1,0 +1,15 @@
+export type VocabularyEntry = {
+  id: number;
+  originalWord: string;
+  infinitiveForm: string | null;
+  englishTranslation: string;
+  contextSentence: string;
+  partOfSpeech: "verb" | "noun" | "adjective" | string;
+  isSelected: boolean;
+};
+
+export type AnalyzeResponse = {
+  songId: number;
+  grouped: Record<string, VocabularyEntry[]>;
+  entries: VocabularyEntry[];
+};
