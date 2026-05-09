@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { importLyrics } from "@/lib/api";
-import { DEMO_USER_ID } from "@/lib/constants";
 
 export function ImportLyricsForm() {
   const router = useRouter();
@@ -18,28 +17,13 @@ export function ImportLyricsForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    if (sourceType === "url") {
-      const trimmed = sourceValue.trim();
-      try {
-        const u = new URL(trimmed);
-        if (u.protocol !== "http:" && u.protocol !== "https:") {
-          setError("URL must start with http:// or https://. For pasted lyrics, use Raw Lyrics.");
-          setLoading(false);
-          return;
-        }
-      } catch {
-        setError("That does not look like a web link. Use Raw Lyrics for pasted lyrics, or paste a full URL (https://…).");
-        setLoading(false);
-        return;
-      }
-    }
     try {
       const data = await importLyrics({
         sourceType,
         sourceValue,
         title: title || "Untitled Song",
         artist: artist || undefined,
-        userId: DEMO_USER_ID,
+        userId: 1,
       });
       router.push(`/analysis/${data.songId}`);
     } catch (err) {

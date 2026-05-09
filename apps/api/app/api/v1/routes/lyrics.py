@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.models import Lyric, Song
+from app.models.models import Lyric, Song, User
 from app.schemas.schemas import ImportLyricsRequest, ImportLyricsResponse
-from app.services.local_user import ensure_local_mvp_user
 from app.services.lyrics_cleaner import clean_lyrics
 from app.services.lyrics_importer import import_lyrics
 
@@ -13,12 +12,18 @@ router = APIRouter()
 
 @router.post("/import-lyrics", response_model=ImportLyricsResponse)
 def import_lyrics_endpoint(payload: ImportLyricsRequest, db: Session = Depends(get_db)):
-    try:
-        raw_text = import_lyrics(payload.sourceType, payload.sourceValue)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    raw_text = import_lyrics(payload.sourceType, payload.sourceValue)
     cleaned = clean_lyrics(raw_text)
-    ensure_local_mvp_user(db, payload.userId)
+    user = db.query(User).filter(User.id == payload.userId).first()
+    if user is None:
+        # MVP-friendly bootstrap: auto-create users referenced by import requests.
+        user = User(
+            id=payload.userId,
+            email=f"user{payload.userId}@lingroove.local",
+            display_name=f"User {payload.userId}",
+        )
+        db.add(user)
+        db.flush()
     song = Song(
         user_id=payload.userId,
         title=payload.title,

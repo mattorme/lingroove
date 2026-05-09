@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import spacy
 
 from app.core.config import settings
@@ -46,3 +48,10 @@ def extract_vocabulary(text: str) -> list[dict]:
             }
         )
     return entries
+
+
+def group_by_pos(entries: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for entry in entries:
+        grouped[entry["part_of_speech"]].append(entry)
+    return dict(grouped)

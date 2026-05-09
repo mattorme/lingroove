@@ -10,7 +10,6 @@ export type VocabularyEntry = {
 
 export type AnalyzeResponse = {
   songId: number;
-  cleanedLyrics: string;
   grouped: Record<string, VocabularyEntry[]>;
   entries: VocabularyEntry[];
 };
