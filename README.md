@@ -120,9 +120,13 @@ alembic upgrade head
 ## Core API Endpoints
 
 - `POST /api/v1/import-lyrics`
+- `GET /api/v1/songs?userId=…`
+- `GET /api/v1/songs/{id}/analysis` (saved lyrics + vocabulary, same shape as analyze)
 - `POST /api/v1/analyze-lyrics`
 - `POST /api/v1/generate-anki`
 - `POST /api/v1/playlist/create`
+- `GET /api/v1/playlists?userId=…`
+- `POST /api/v1/playlist/{id}/songs` (body: `{ "songId": … }`)
 - `GET /api/v1/playlist/{id}`
 
 ## Example API Payloads
@@ -167,6 +171,7 @@ Response (shape):
 ```json
 {
   "songId": 10,
+  "cleanedLyrics": "Quiero bailar toda la noche",
   "grouped": {
     "verb": [
       {
