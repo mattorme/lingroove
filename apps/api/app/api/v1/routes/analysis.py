@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.models import Lyric, VocabularyEntry
-from app.schemas.schemas import AnalyzeLyricsRequest, AnalyzeLyricsResponse, VocabularyOut
-from app.services.nlp_pipeline import extract_vocabulary, group_by_pos
+from app.schemas.schemas import AnalyzeLyricsRequest, AnalyzeLyricsResponse
+from app.services.analysis_payload import build_analyze_response, entries_from_vocab_rows
+from app.services.nlp_pipeline import extract_vocabulary
 
 router = APIRouter()
 
@@ -18,7 +19,7 @@ def analyze_lyrics(payload: AnalyzeLyricsRequest, db: Session = Depends(get_db))
 
     db.execute(delete(VocabularyEntry).where(VocabularyEntry.song_id == payload.songId))
     extracted = extract_vocabulary(lyric.clean_text)
-    saved = []
+    saved: list[VocabularyEntry] = []
     for item in extracted:
         row = VocabularyEntry(song_id=payload.songId, lyric_id=lyric.id, **item, is_selected=True)
         db.add(row)
@@ -26,33 +27,5 @@ def analyze_lyrics(payload: AnalyzeLyricsRequest, db: Session = Depends(get_db))
         saved.append(row)
     db.commit()
 
-    entries = [
-        VocabularyOut(
-            id=row.id,
-            originalWord=row.original_word,
-            infinitiveForm=row.infinitive_form,
-            englishTranslation=row.english_translation,
-            contextSentence=row.context_line,
-            partOfSpeech=row.part_of_speech,
-            isSelected=row.is_selected,
-        )
-        for row in saved
-    ]
-    grouped_raw = group_by_pos(extracted)
-    grouped = {
-        key: [
-            VocabularyOut(
-                id=row.id,
-                originalWord=row.original_word,
-                infinitiveForm=row.infinitive_form,
-                englishTranslation=row.english_translation,
-                contextSentence=row.context_line,
-                partOfSpeech=row.part_of_speech,
-                isSelected=row.is_selected,
-            )
-            for row in saved
-            if row.part_of_speech == key
-        ]
-        for key in grouped_raw.keys()
-    }
-    return AnalyzeLyricsResponse(songId=payload.songId, grouped=grouped, entries=entries)
+    entries = entries_from_vocab_rows(saved)
+    return build_analyze_response(payload.songId, lyric.clean_text, entries)
