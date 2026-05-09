@@ -8,6 +8,19 @@ Lingroove helps users learn Spanish through music by importing lyrics, extractin
 - `apps/api`: FastAPI + spaCy + PostgreSQL backend
 - `infra`: Docker Compose for local Postgres
 - `.env.example`: shared environment variable template
+- `docs/`: full project guide (Markdown + PDF)
+
+## Project documentation
+
+- **Markdown:** [docs/LINGROOVE_PROJECT_GUIDE.md](docs/LINGROOVE_PROJECT_GUIDE.md) — architecture, libraries, data model, API behavior, frontend pages, MVP vs future work.
+- **PDF:** [docs/LINGROOVE_PROJECT_GUIDE.pdf](docs/LINGROOVE_PROJECT_GUIDE.pdf) — same content, formatted for reading or sharing.
+
+To regenerate the PDF after editing the Markdown (requires [ReportLab](https://www.reportlab.com/)):
+
+```bash
+python3 -m pip install reportlab
+python3 docs/build_pdf.py
+```
 
 ## Tech Stack
 
