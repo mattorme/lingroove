@@ -45,6 +45,15 @@ export async function analyzeLyrics(songId: number): Promise<AnalyzeResponse> {
   return res.json();
 }
 
+export async function getSavedSongAnalysis(songId: number): Promise<AnalyzeResponse> {
+  const res = await fetch(`${API_BASE}/songs/${songId}/analysis`);
+  if (res.status === 404) {
+    throw new Error("NOT_FOUND");
+  }
+  if (!res.ok) throw new Error(await parseError(res, "Failed to load saved analysis"));
+  return res.json();
+}
+
 export async function createPlaylist(payload: { userId: number; name: string; description?: string }) {
   const res = await fetch(`${API_BASE}/playlist/create`, {
     method: "POST",
@@ -53,4 +62,40 @@ export async function createPlaylist(payload: { userId: number; name: string; de
   });
   if (!res.ok) throw new Error(await parseError(res, "Failed to create playlist"));
   return res.json();
+}
+
+export type SongSummary = {
+  id: number;
+  title: string;
+  artist: string | null;
+  sourceType: string;
+  createdAt: string;
+};
+
+export async function listSongs(userId: number): Promise<{ songs: SongSummary[] }> {
+  const res = await fetch(`${API_BASE}/songs?userId=${userId}`);
+  if (!res.ok) throw new Error(await parseError(res, "Failed to load songs"));
+  return res.json();
+}
+
+export type PlaylistSummary = {
+  id: number;
+  name: string;
+  description: string | null;
+  songCount: number;
+};
+
+export async function listPlaylists(userId: number): Promise<{ playlists: PlaylistSummary[] }> {
+  const res = await fetch(`${API_BASE}/playlists?userId=${userId}`);
+  if (!res.ok) throw new Error(await parseError(res, "Failed to load playlists"));
+  return res.json();
+}
+
+export async function addSongToPlaylist(playlistId: number, songId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/playlist/${playlistId}/songs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ songId }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to add song to playlist"));
 }

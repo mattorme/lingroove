@@ -32,6 +32,7 @@ class VocabularyOut(BaseModel):
 
 class AnalyzeLyricsResponse(BaseModel):
     songId: int
+    cleanedLyrics: str
     grouped: dict[str, list[VocabularyOut]]
     entries: list[VocabularyOut]
 
@@ -66,3 +67,30 @@ class PlaylistResponse(BaseModel):
 class GenerateAnkiRequest(BaseModel):
     songId: int
     selectedVocabularyIds: list[int]
+
+
+class SongSummary(BaseModel):
+    id: int
+    title: str
+    artist: str | None
+    sourceType: str
+    createdAt: str
+
+
+class SongListResponse(BaseModel):
+    songs: list[SongSummary]
+
+
+class PlaylistSummary(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    songCount: int
+
+
+class PlaylistListResponse(BaseModel):
+    playlists: list[PlaylistSummary]
+
+
+class AddSongToPlaylistRequest(BaseModel):
+    songId: int

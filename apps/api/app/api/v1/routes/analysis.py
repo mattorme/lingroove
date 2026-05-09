@@ -55,4 +55,9 @@ def analyze_lyrics(payload: AnalyzeLyricsRequest, db: Session = Depends(get_db))
         ]
         for key in grouped_raw.keys()
     }
-    return AnalyzeLyricsResponse(songId=payload.songId, grouped=grouped, entries=entries)
+    return AnalyzeLyricsResponse(
+        songId=payload.songId,
+        cleanedLyrics=lyric.clean_text,
+        grouped=grouped,
+        entries=entries,
+    )
