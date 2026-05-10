@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: str = "http://localhost:3000"
     spacy_model: str = "es_core_news_md"
-    translation_provider: str = "stub"
+    translation_provider: str = "google"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

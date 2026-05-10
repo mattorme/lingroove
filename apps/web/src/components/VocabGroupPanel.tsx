@@ -8,6 +8,11 @@ type Props = {
   onToggle: (id: number) => void;
 };
 
+function showInfinitiveLine(entry: VocabularyEntry): boolean {
+  if (entry.partOfSpeech !== "verb" || !entry.infinitiveForm) return false;
+  return entry.infinitiveForm.toLowerCase() !== entry.originalWord.toLowerCase();
+}
+
 export function VocabGroupPanel({ entries, selected, onToggle }: Props) {
   return (
     <div className="space-y-3">
@@ -19,8 +24,16 @@ export function VocabGroupPanel({ entries, selected, onToggle }: Props) {
                 {entry.originalWord}{" "}
                 <span className="text-xs text-textSecondary">({entry.partOfSpeech})</span>
               </p>
-              <p className="text-sm text-textSecondary">{entry.englishTranslation}</p>
-              <p className="mt-1 text-sm text-textPrimary/90">{entry.contextSentence}</p>
+              {showInfinitiveLine(entry) ? (
+                <p className="mt-0.5 text-xs text-textSecondary">
+                  Infinitive:{" "}
+                  <span className="font-medium text-textPrimary">{entry.infinitiveForm}</span>
+                </p>
+              ) : null}
+              <p className="mt-1 text-sm font-medium text-accent">{entry.englishTranslation}</p>
+              <p className="mt-2 text-sm italic text-textPrimary/80">
+                &ldquo;{entry.contextSentence}&rdquo;
+              </p>
             </div>
             <input
               type="checkbox"
