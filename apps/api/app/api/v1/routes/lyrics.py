@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,7 +13,10 @@ router = APIRouter()
 
 @router.post("/import-lyrics", response_model=ImportLyricsResponse)
 def import_lyrics_endpoint(payload: ImportLyricsRequest, db: Session = Depends(get_db)):
-    raw_text = import_lyrics(payload.sourceType, payload.sourceValue)
+    try:
+        raw_text = import_lyrics(payload.sourceType, payload.sourceValue)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     cleaned = clean_lyrics(raw_text)
     ensure_local_mvp_user(db, payload.userId)
     song = Song(
