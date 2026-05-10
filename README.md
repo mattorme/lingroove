@@ -94,8 +94,11 @@ docker compose up -d
 ```bash
 cd apps/api
 source .venv/bin/activate
+alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Run **`alembic upgrade head`** whenever Postgres is new or empty (e.g. after `docker compose down -v` or a fresh volume). Without it, the API will error with missing tables like `relation "users" does not exist`.
 
 ### 3) Start frontend
 
