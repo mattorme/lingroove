@@ -16,6 +16,7 @@ def import_lyrics_endpoint(payload: ImportLyricsRequest, db: Session = Depends(g
     try:
         raw_text = import_lyrics(payload.sourceType, payload.sourceValue)
     except ValueError as e:
+        # import_lyrics raises ValueError only with fixed, client-safe messages
         raise HTTPException(status_code=400, detail=str(e)) from e
     cleaned = clean_lyrics(raw_text)
     ensure_local_mvp_user(db, payload.userId)

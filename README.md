@@ -46,6 +46,13 @@ Key vars:
 - `TRANSLATION_PROVIDER`
 - `NEXT_PUBLIC_API_BASE_URL`
 
+## Security notes
+
+- **Secrets:** Never commit `.env`. Use strong database credentials and rotate them in production; values in `.env.example` are for local development only.
+- **Lyrics URL import:** The backend only allows `http`/`https` and blocks obvious loopback, private, and link-local hosts in the URL you pass. That reduces SSRF risk for literal IPs and hostnames; a hostname that resolves to an internal address is not fully blocked unless you add DNS resolution checks or fetch via a dedicated proxy.
+- **Error responses:** Import failures return short, fixed client messages; full tracebacks are logged server-side. Unhandled errors return a generic `500` body without internal details.
+- **CORS:** `CORS_ORIGINS` should list explicit frontend origins. Avoid pairing wildcard origins with credentials in production.
+
 ## Local Setup
 
 ### 1) Start Postgres

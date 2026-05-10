@@ -5,7 +5,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/
 async function parseError(res: Response, fallback: string): Promise<string> {
   try {
     const data = await res.json();
-    if (typeof data?.detail === "string") return data.detail;
+    // Only surface string details from the API; arrays/objects may contain validation internals
+    if (typeof data?.detail === "string" && data.detail.length > 0) return data.detail;
   } catch {
     // ignore JSON parse errors and use fallback
   }
@@ -27,9 +28,7 @@ export async function importLyrics(payload: {
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new Error(
-      `Cannot reach API at ${API_BASE}. Check backend server, CORS, and NEXT_PUBLIC_API_BASE_URL.`
-    );
+    throw new Error("Cannot reach the API. Check that the backend is running and CORS is configured.");
   }
   if (!res.ok) throw new Error(await parseError(res, "Failed to import lyrics"));
   return res.json();
