@@ -38,9 +38,13 @@ class AnalyzeLyricsResponse(BaseModel):
 
 
 class CreatePlaylistRequest(BaseModel):
-    userId: int
-    name: str
+    userId: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=120)
     description: str | None = None
+
+
+class RenamePlaylistRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
 
 
 class PlaylistCreateResponse(BaseModel):
@@ -93,4 +97,4 @@ class PlaylistListResponse(BaseModel):
 
 
 class AddSongToPlaylistRequest(BaseModel):
-    songId: int
+    songId: int = Field(ge=1)
