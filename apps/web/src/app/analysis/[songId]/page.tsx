@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { addSongToPlaylist, analyzeLyrics, getSavedSongAnalysis, listPlaylists, type PlaylistSummary } from "@/lib/api";
+import { AddToPlaylistMenu } from "@/components/AddToPlaylistMenu";
+import { analyzeLyrics, getSavedSongAnalysis } from "@/lib/api";
 import { VocabGroupPanel } from "@/components/VocabGroupPanel";
 import { VocabularyEntry } from "@/types/api";
 
@@ -17,10 +18,6 @@ export default function SongAnalysisPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [hydrating, setHydrating] = useState(true);
-  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
-  const [playlistPick, setPlaylistPick] = useState("");
-  const [playlistMsg, setPlaylistMsg] = useState<string | null>(null);
-  const [addingPlaylist, setAddingPlaylist] = useState(false);
 
   const grouped = useMemo(() => {
     return {
@@ -29,12 +26,6 @@ export default function SongAnalysisPage() {
       adjective: entries.filter((e) => e.partOfSpeech === "adjective"),
     };
   }, [entries]);
-
-  useEffect(() => {
-    listPlaylists(DEMO_USER_ID)
-      .then((r) => setPlaylists(r.playlists))
-      .catch(() => setPlaylists([]));
-  }, []);
 
   useEffect(() => {
     if (!Number.isFinite(songId) || songId < 1) {
@@ -81,23 +72,6 @@ export default function SongAnalysisPage() {
     }
   }
 
-  async function onAddToPlaylist() {
-    const id = Number(playlistPick);
-    if (!id) return;
-    setAddingPlaylist(true);
-    setPlaylistMsg(null);
-    try {
-      await addSongToPlaylist(id, songId);
-      setPlaylistMsg("Added to playlist.");
-      const r = await listPlaylists(DEMO_USER_ID);
-      setPlaylists(r.playlists);
-    } catch (e) {
-      setPlaylistMsg(e instanceof Error ? e.message : "Could not add to playlist.");
-    } finally {
-      setAddingPlaylist(false);
-    }
-  }
-
   function onToggle(id: number) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -111,34 +85,11 @@ export default function SongAnalysisPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-2xl font-semibold">Song Analysis #{songId}</h1>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+        <div className="flex min-w-0 max-w-md flex-col gap-2 sm:items-end">
           <button className="button-primary" onClick={runAnalysis} disabled={loading || hydrating}>
             {loading ? "Analyzing…" : hydrating ? "Loading…" : entries.length > 0 ? "Re-analyze lyrics" : "Analyze lyrics"}
           </button>
-          {playlists.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                className="rounded-xl border border-white/10 bg-surfaceSoft px-3 py-2 text-sm"
-                value={playlistPick}
-                onChange={(e) => setPlaylistPick(e.target.value)}
-              >
-                <option value="">Add to playlist…</option>
-                {playlists.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="button-secondary text-sm" disabled={!playlistPick || addingPlaylist} onClick={onAddToPlaylist}>
-                {addingPlaylist ? "Adding…" : "Add"}
-              </button>
-            </div>
-          ) : (
-            <p className="text-xs text-textSecondary">
-              Create a playlist on the <Link href="/dashboard" className="text-accent underline">dashboard</Link> to save this song.
-            </p>
-          )}
-          {playlistMsg ? <p className="text-xs text-textSecondary">{playlistMsg}</p> : null}
+          <AddToPlaylistMenu userId={DEMO_USER_ID} songId={songId} />
         </div>
       </div>
       <section className="card">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ImportLyricsForm } from "@/components/ImportLyricsForm";
+import { AddToPlaylistMenu } from "@/components/AddToPlaylistMenu";
 import { createPlaylist, listPlaylists, listSongs, type PlaylistSummary, type SongSummary } from "@/lib/api";
 
 const DEMO_USER_ID = 1;
@@ -56,23 +57,33 @@ export default function DashboardPage() {
           {songs.length === 0 ? (
             <p className="text-sm text-textSecondary">No songs yet. Import lyrics above — they will show here when you return to the dashboard.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {songs.map((s) => (
-                <li key={s.id}>
-                  <Link href={`/analysis/${s.id}`} className="block rounded-xl border border-white/10 bg-surfaceSoft px-3 py-2 transition hover:border-accent">
-                    <span className="font-medium">{s.title}</span>
-                    {s.artist ? <span className="text-textSecondary"> · {s.artist}</span> : null}
-                    <span className="mt-0.5 block text-xs text-textSecondary">
-                      {s.sourceType === "url" ? "URL" : "Raw"} · {new Date(s.createdAt).toLocaleString()}
-                    </span>
-                  </Link>
+                <li key={s.id} className="rounded-xl border border-white/10 bg-surfaceSoft p-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <Link href={`/analysis/${s.id}`} className="block min-w-0 flex-1 transition hover:text-accent">
+                      <span className="font-medium">{s.title}</span>
+                      {s.artist ? <span className="text-textSecondary"> · {s.artist}</span> : null}
+                      <span className="mt-0.5 block text-xs text-textSecondary">
+                        {s.sourceType === "url" ? "URL" : "Raw"} · {new Date(s.createdAt).toLocaleString()}
+                      </span>
+                    </Link>
+                    <div className="min-w-0 shrink-0 lg:max-w-sm">
+                      <AddToPlaylistMenu userId={DEMO_USER_ID} songId={s.id} onPlaylistsChanged={refreshLists} />
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
         <div className="card space-y-3">
-          <h2 className="text-lg font-semibold">Playlists</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Playlists</h2>
+            <Link href="/playlists" className="text-xs text-accent underline">
+              Manage
+            </Link>
+          </div>
           <form onSubmit={onCreatePlaylist} className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
               className="min-w-0 flex-1 rounded-xl border border-white/10 bg-surfaceSoft px-3 py-2 text-sm"
@@ -85,7 +96,13 @@ export default function DashboardPage() {
             </button>
           </form>
           {playlists.length === 0 ? (
-            <p className="text-sm text-textSecondary">No playlists yet. Create one to organize songs (add songs to playlists from the API or a future UI flow).</p>
+            <p className="text-sm text-textSecondary">
+              No playlists yet. Create one here or on the{" "}
+              <Link href="/playlists" className="text-accent underline">
+                Playlists
+              </Link>{" "}
+              page, then use &quot;Save to Playlist&quot; on any song.
+            </p>
           ) : (
             <ul className="space-y-2">
               {playlists.map((p) => (

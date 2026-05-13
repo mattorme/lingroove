@@ -2,16 +2,82 @@ import { AnalyzeResponse } from "@/types/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
+const JSON_HEADERS = { "Content-Type": "application/json" } as const;
+
+// ---------------------------------------------------------------------------
+// Internal fetch helpers
+// ---------------------------------------------------------------------------
+
 async function parseError(res: Response, fallback: string): Promise<string> {
   try {
     const data = await res.json();
-    // Only surface string details from the API; arrays/objects may contain validation internals
+    // Only surface string details; arrays/objects may contain validation internals
     if (typeof data?.detail === "string" && data.detail.length > 0) return data.detail;
   } catch {
-    // ignore JSON parse errors and use fallback
+    // ignore JSON parse errors
   }
   return fallback;
 }
+
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE}${path}`, init);
+  } catch {
+    throw new Error("Cannot reach the API. Check that the backend is running and CORS is configured.");
+  }
+}
+
+async function apiGet<T>(path: string, errorMsg: string): Promise<T> {
+  const res = await apiFetch(path);
+  if (!res.ok) throw new Error(await parseError(res, errorMsg));
+  return res.json() as Promise<T>;
+}
+
+async function apiPost<T>(path: string, body: unknown, errorMsg: string): Promise<T> {
+  const res = await apiFetch(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(await parseError(res, errorMsg));
+  return res.json() as Promise<T>;
+}
+
+async function apiPatch<T>(path: string, body: unknown, errorMsg: string): Promise<T> {
+  const res = await apiFetch(path, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(await parseError(res, errorMsg));
+  return res.json() as Promise<T>;
+}
+
+async function apiDelete(path: string, errorMsg: string): Promise<void> {
+  const res = await apiFetch(path, { method: "DELETE" });
+  if (!res.ok) throw new Error(await parseError(res, errorMsg));
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function filenameFromContentDisposition(header: string | null, fallback: string): string {
+  if (!header) return fallback;
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted?.[1]) return quoted[1].trim();
+  const unquoted = /filename=([^;]+)/i.exec(header);
+  if (unquoted?.[1]) return unquoted[1].trim().replace(/^UTF-8''/, "");
+  return fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export type ImportLyricsResponse = {
+  songId: number;
+  lyricId: number;
+  cleanedLyrics: string;
+  detectedLanguage: string;
+};
 
 export async function importLyrics(payload: {
   sourceType: "url" | "raw";
@@ -19,48 +85,19 @@ export async function importLyrics(payload: {
   title?: string;
   artist?: string;
   userId: number;
-}) {
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/import-lyrics`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    throw new Error("Cannot reach the API. Check that the backend is running and CORS is configured.");
-  }
-  if (!res.ok) throw new Error(await parseError(res, "Failed to import lyrics"));
-  return res.json();
+}): Promise<ImportLyricsResponse> {
+  return apiPost<ImportLyricsResponse>("/import-lyrics", payload, "Failed to import lyrics");
 }
 
 export async function analyzeLyrics(songId: number): Promise<AnalyzeResponse> {
-  const res = await fetch(`${API_BASE}/analyze-lyrics`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ songId }),
-  });
-  if (!res.ok) throw new Error(await parseError(res, "Failed to analyze lyrics"));
-  return res.json();
+  return apiPost<AnalyzeResponse>("/analyze-lyrics", { songId }, "Failed to analyze lyrics");
 }
 
 export async function getSavedSongAnalysis(songId: number): Promise<AnalyzeResponse> {
-  const res = await fetch(`${API_BASE}/songs/${songId}/analysis`);
-  if (res.status === 404) {
-    throw new Error("NOT_FOUND");
-  }
+  const res = await apiFetch(`/songs/${songId}/analysis`);
+  if (res.status === 404) throw new Error("NOT_FOUND");
   if (!res.ok) throw new Error(await parseError(res, "Failed to load saved analysis"));
-  return res.json();
-}
-
-export async function createPlaylist(payload: { userId: number; name: string; description?: string }) {
-  const res = await fetch(`${API_BASE}/playlist/create`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(await parseError(res, "Failed to create playlist"));
-  return res.json();
+  return res.json() as Promise<AnalyzeResponse>;
 }
 
 export type SongSummary = {
@@ -72,9 +109,7 @@ export type SongSummary = {
 };
 
 export async function listSongs(userId: number): Promise<{ songs: SongSummary[] }> {
-  const res = await fetch(`${API_BASE}/songs?userId=${userId}`);
-  if (!res.ok) throw new Error(await parseError(res, "Failed to load songs"));
-  return res.json();
+  return apiGet(`/songs?userId=${userId}`, "Failed to load songs");
 }
 
 export type PlaylistSummary = {
@@ -85,16 +120,56 @@ export type PlaylistSummary = {
 };
 
 export async function listPlaylists(userId: number): Promise<{ playlists: PlaylistSummary[] }> {
-  const res = await fetch(`${API_BASE}/playlists?userId=${userId}`);
-  if (!res.ok) throw new Error(await parseError(res, "Failed to load playlists"));
-  return res.json();
+  return apiGet(`/playlists?userId=${userId}`, "Failed to load playlists");
+}
+
+export async function createPlaylist(payload: {
+  userId: number;
+  name: string;
+  description?: string;
+}): Promise<{ id: number; name: string }> {
+  return apiPost("/playlist/create", payload, "Failed to create playlist");
+}
+
+export async function renamePlaylist(playlistId: number, payload: { name: string }): Promise<void> {
+  await apiPatch(`/playlist/${playlistId}`, payload, "Failed to rename playlist");
+}
+
+export async function deletePlaylist(playlistId: number): Promise<void> {
+  return apiDelete(`/playlist/${playlistId}`, "Failed to delete playlist");
+}
+
+export type PlaylistSongRow = {
+  songId: number;
+  title: string;
+  artist: string | null;
+};
+
+export type PlaylistDetail = {
+  id: number;
+  name: string;
+  description: string | null;
+  vocabularyCount: number;
+  songs: PlaylistSongRow[];
+};
+
+export async function getPlaylist(playlistId: number): Promise<PlaylistDetail> {
+  return apiGet(`/playlist/${playlistId}`, "Failed to load playlist");
 }
 
 export async function addSongToPlaylist(playlistId: number, songId: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/playlist/${playlistId}/songs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ songId }),
-  });
-  if (!res.ok) throw new Error(await parseError(res, "Failed to add song to playlist"));
+  await apiPost(`/playlist/${playlistId}/songs`, { songId }, "Failed to add song to playlist");
+}
+
+export async function removeSongFromPlaylist(playlistId: number, songId: number): Promise<void> {
+  return apiDelete(`/playlist/${playlistId}/songs/${songId}`, "Failed to remove song from playlist");
+}
+
+export async function exportPlaylistCsv(playlistId: number, playlistName: string): Promise<void> {
+  const res = await apiFetch(`/playlist/${playlistId}/export-csv`);
+  if (!res.ok) throw new Error(await parseError(res, "Failed to export playlist"));
+  const blob = await res.blob();
+  const slug = (playlistName.trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "playlist") + ".csv";
+  const filename = filenameFromContentDisposition(res.headers.get("Content-Disposition"), slug);
+  triggerBlobDownload(blob, filename);
 }
