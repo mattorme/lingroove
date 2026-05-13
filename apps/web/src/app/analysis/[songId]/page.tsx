@@ -4,15 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AddToPlaylistMenu } from "@/components/AddToPlaylistMenu";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { analyzeLyrics, getSavedSongAnalysis } from "@/lib/api";
 import { VocabGroupPanel } from "@/components/VocabGroupPanel";
 import { VocabularyEntry } from "@/types/api";
 
-const DEMO_USER_ID = 1;
-
 export default function SongAnalysisPage() {
   const params = useParams<{ songId: string }>();
   const songId = Number(params.songId);
+  const { user, loading: authLoading } = useRequireAuth();
   const [entries, setEntries] = useState<VocabularyEntry[]>([]);
   const [lyrics, setLyrics] = useState("Loading…");
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -28,6 +28,7 @@ export default function SongAnalysisPage() {
   }, [entries]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     if (!Number.isFinite(songId) || songId < 1) {
       setHydrating(false);
       setLyrics("Invalid song.");
@@ -58,7 +59,7 @@ export default function SongAnalysisPage() {
     return () => {
       cancelled = true;
     };
-  }, [songId]);
+  }, [songId, user, authLoading]);
 
   async function runAnalysis() {
     setLoading(true);
@@ -81,6 +82,8 @@ export default function SongAnalysisPage() {
     });
   }
 
+  if (authLoading || !user) return null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -89,7 +92,7 @@ export default function SongAnalysisPage() {
           <button className="button-primary" onClick={runAnalysis} disabled={loading || hydrating}>
             {loading ? "Analyzing…" : hydrating ? "Loading…" : entries.length > 0 ? "Re-analyze lyrics" : "Analyze lyrics"}
           </button>
-          <AddToPlaylistMenu userId={DEMO_USER_ID} songId={songId} />
+          <AddToPlaylistMenu songId={songId} />
         </div>
       </div>
       <section className="card">

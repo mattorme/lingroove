@@ -1,31 +1,33 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { generateAnkiCsv } from "@/lib/api";
 
 function ExportPageContent() {
+  const { user, loading } = useRequireAuth();
   const searchParams = useSearchParams();
   const songId = Number(searchParams.get("songId") || "0");
   const ids = (searchParams.get("ids") || "")
     .split(",")
     .filter(Boolean)
     .map((item) => Number(item));
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  if (loading || !user) return null;
 
   async function onExport() {
-    const res = await fetch(`${API_BASE}/generate-anki`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ songId, selectedVocabularyIds: ids }),
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "lingroove-anki.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    setError(null);
+    setExporting(true);
+    try {
+      await generateAnkiCsv(songId, ids);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -34,8 +36,13 @@ function ExportPageContent() {
       <div className="card">
         <p className="text-textSecondary">Song ID: {songId}</p>
         <p className="text-textSecondary">Selected entries: {ids.length}</p>
-        <button className="button-primary mt-4" onClick={onExport} disabled={!songId || ids.length === 0}>
-          Export CSV
+        {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
+        <button
+          className="button-primary mt-4"
+          onClick={onExport}
+          disabled={exporting || !songId || ids.length === 0}
+        >
+          {exporting ? "Exporting…" : "Export CSV"}
         </button>
       </div>
     </div>
@@ -44,7 +51,7 @@ function ExportPageContent() {
 
 export default function ExportPage() {
   return (
-    <Suspense fallback={<p className="text-textSecondary">Loading export page...</p>}>
+    <Suspense fallback={<p className="text-textSecondary">Loading…</p>}>
       <ExportPageContent />
     </Suspense>
   );

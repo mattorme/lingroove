@@ -23,7 +23,6 @@ export function ImportLyricsForm() {
         sourceValue,
         title: title || "Untitled Song",
         artist: artist || undefined,
-        userId: 1,
       });
       router.push(`/analysis/${data.songId}`);
     } catch (err) {

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createPlaylist, listPlaylists, type PlaylistSummary } from "@/lib/api";
 
-const DEMO_USER_ID = 1;
-
 export default function PlaylistsPage() {
+  const { user, loading } = useRequireAuth();
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [playlistName, setPlaylistName] = useState("");
@@ -15,7 +15,7 @@ export default function PlaylistsPage() {
   const refreshLists = useCallback(async () => {
     setLoadError(null);
     try {
-      const plRes = await listPlaylists(DEMO_USER_ID);
+      const plRes = await listPlaylists();
       setPlaylists(plRes.playlists);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load playlists.");
@@ -23,21 +23,23 @@ export default function PlaylistsPage() {
   }, []);
 
   useEffect(() => {
-    void refreshLists();
-  }, [refreshLists]);
+    if (user) void refreshLists();
+  }, [user, refreshLists]);
 
   async function onCreatePlaylist(e: React.FormEvent) {
     e.preventDefault();
     if (!playlistName.trim()) return;
     setCreatingPlaylist(true);
     try {
-      await createPlaylist({ userId: DEMO_USER_ID, name: playlistName.trim() });
+      await createPlaylist({ name: playlistName.trim() });
       setPlaylistName("");
       await refreshLists();
     } finally {
       setCreatingPlaylist(false);
     }
   }
+
+  if (loading || !user) return null;
 
   return (
     <div className="space-y-6">

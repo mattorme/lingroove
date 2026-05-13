@@ -1,4 +1,4 @@
-# Lingroove MVP
+# Lingroove
 
 Lingroove helps users learn Spanish through music by importing lyrics, extracting vocabulary (verbs/nouns/adjectives), organizing songs in playlists, and exporting Anki-compatible CSV files.
 
@@ -7,7 +7,7 @@ Lingroove helps users learn Spanish through music by importing lyrics, extractin
 - `apps/web`: Next.js + Tailwind frontend
 - `apps/api`: FastAPI + spaCy + PostgreSQL backend
 - `infra`: Docker Compose for local Postgres
-- `.env.example`: shared environment variable template
+- `.env.example`: environment variable template
 - `docs/`: full project guide (Markdown + PDF)
 
 ## Project documentation
@@ -27,30 +27,56 @@ python3 docs/build_pdf.py
 - Frontend: Next.js App Router, TypeScript, Tailwind CSS
 - Backend: FastAPI, SQLAlchemy, Alembic, spaCy
 - Database: PostgreSQL
+- Auth: JWT (HS256) via `python-jose`, passwords hashed with `bcrypt`
 
 ## Environment Variables
 
-Copy `.env.example` into `.env` and adjust as needed:
+### First-time setup
+
+**Step 1** — Copy the example file:
 
 ```bash
 cp .env.example .env
 ```
 
-Key vars:
+**Step 2** — Generate a secret key and paste it into `.env`:
 
-- `DATABASE_URL`
-- `API_HOST`
-- `API_PORT`
-- `CORS_ORIGINS`
-- `SPACY_MODEL`
-- `TRANSLATION_PROVIDER`
-- `NEXT_PUBLIC_API_BASE_URL`
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Open `.env` and set:
+
+```
+SECRET_KEY=<paste the output here>
+```
+
+`SECRET_KEY` has no default. The backend will refuse to start if it is missing or empty. Every developer and every deployment environment needs its own unique value.
+
+**Step 3** — Make sure `.env` is in `.gitignore`. Never commit it. The secret key in `.env` is the only thing preventing someone from forging login tokens for any account.
+
+### Variable reference
+
+| Variable | Required | Description |
+|---|---|---|
+| `SECRET_KEY` | **Yes** | JWT signing secret. Generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `CORS_ORIGINS` | Yes | Comma-separated allowed frontend origins |
+| `API_HOST` / `API_PORT` | No | Backend bind address (defaults: `0.0.0.0` / `8000`) |
+| `SPACY_MODEL` | No | spaCy language model (default: `es_core_news_md`) |
+| `TRANSLATION_PROVIDER` | No | Translation backend (default: `google`) |
+| `NEXT_PUBLIC_API_BASE_URL` | No | API base URL used by the frontend (default: `http://localhost:8000/api/v1`) |
 
 ## Security notes
 
-- **Secrets:** Never commit `.env`. Use strong database credentials and rotate them in production; values in `.env.example` are for local development only.
-- **Lyrics URL import:** The backend only allows `http`/`https` and blocks obvious loopback, private, and link-local hosts in the URL you pass. That reduces SSRF risk for literal IPs and hostnames; a hostname that resolves to an internal address is not fully blocked unless you add DNS resolution checks or fetch via a dedicated proxy.
-- **Error responses:** Import failures return short, fixed client messages; full tracebacks are logged server-side. Unhandled errors return a generic `500` body without internal details.
+- **JWT auth:** All data routes require a `Authorization: Bearer <token>` header. Tokens are issued on signup/login and expire after 7 days.
+- **Secret key:** The server refuses to start with the default `SECRET_KEY` when `APP_ENV=production`. See above for how to generate one.
+- **Passwords:** Hashed with bcrypt (work factor 12). Passwords are limited to 72 bytes to prevent silent bcrypt truncation.
+- **Timing-safe login:** The login endpoint always runs bcrypt (real or dummy) so response time does not reveal whether an email is registered.
+- **Ownership enforcement:** Every route scopes queries to the authenticated user. Accessing another user's resource by ID returns 403.
+- **Secrets:** Never commit `.env`. Use strong database credentials and rotate them in production.
+- **Lyrics URL import:** The backend only allows `http`/`https` and blocks obvious loopback, private, and link-local hosts. A hostname that resolves to an internal address is not fully blocked unless you add DNS-resolution checks or proxy the fetch.
+- **Error responses:** Import failures return short, fixed client messages; full tracebacks are logged server-side only.
 - **CORS:** `CORS_ORIGINS` should list explicit frontend origins. Avoid pairing wildcard origins with credentials in production.
 
 ## Local Setup
@@ -82,7 +108,7 @@ npm install
 npm run dev
 ```
 
-Frontend runs on `http://localhost:3000`.
+Frontend runs on `http://localhost:3000`.  
 Backend runs on `http://localhost:8000`.
 
 ## Start After Installation
@@ -105,7 +131,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Run **`alembic upgrade head`** whenever Postgres is new or empty (e.g. after `docker compose down -v` or a fresh volume). Without it, the API will error with missing tables like `relation "users" does not exist`.
+Run `alembic upgrade head` whenever Postgres is new or empty (e.g. after `docker compose down -v` or a fresh volume).
 
 ### 3) Start frontend
 
@@ -129,29 +155,90 @@ alembic upgrade head
 
 ## Core API Endpoints
 
-- `POST /api/v1/import-lyrics`
-- `GET /api/v1/songs?userId=…`
-- `GET /api/v1/songs/{id}/analysis` (saved lyrics + vocabulary, same shape as analyze)
-- `POST /api/v1/analyze-lyrics`
-- `POST /api/v1/generate-anki`
-- `POST /api/v1/playlist/create`
-- `GET /api/v1/playlists?userId=…`
-- `POST /api/v1/playlist/{id}/songs` (body: `{ "songId": … }`)
-- `GET /api/v1/playlist/{id}`
+All routes except `/auth/signup`, `/auth/login`, and `/health` require:
+
+```
+Authorization: Bearer <token>
+```
+
+### Auth
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/auth/signup` | Create account, returns JWT |
+| `POST` | `/api/v1/auth/login` | Authenticate, returns JWT |
+| `GET` | `/api/v1/auth/me` | Current user profile |
+
+### Songs & Lyrics
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/v1/import-lyrics` | Import lyrics from URL or raw text |
+| `GET` | `/api/v1/songs` | List authenticated user's songs |
+| `GET` | `/api/v1/songs/{id}/analysis` | Saved lyrics + vocabulary |
+| `POST` | `/api/v1/analyze-lyrics` | Run NLP analysis on a song |
+| `POST` | `/api/v1/generate-anki` | Generate Anki CSV download |
+
+### Playlists
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/playlists` | List authenticated user's playlists |
+| `POST` | `/api/v1/playlist/create` | Create a playlist |
+| `GET` | `/api/v1/playlist/{id}` | Get playlist with songs |
+| `PATCH` | `/api/v1/playlist/{id}` | Rename a playlist |
+| `DELETE` | `/api/v1/playlist/{id}` | Delete a playlist |
+| `POST` | `/api/v1/playlist/{id}/songs` | Add song to playlist |
+| `DELETE` | `/api/v1/playlist/{id}/songs/{song_id}` | Remove song from playlist |
+| `GET` | `/api/v1/playlist/{id}/export-csv` | Export playlist vocabulary as CSV |
 
 ## Example API Payloads
 
-### POST `/api/v1/import-lyrics`
+### POST `/api/v1/auth/signup`
 
 Request:
+
+```json
+{
+  "email": "user@example.com",
+  "display_name": "Jane",
+  "password": "mysecretpassword"
+}
+```
+
+Response:
+
+```json
+{ "access_token": "<jwt>", "token_type": "bearer" }
+```
+
+### POST `/api/v1/auth/login`
+
+Request:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "mysecretpassword"
+}
+```
+
+Response:
+
+```json
+{ "access_token": "<jwt>", "token_type": "bearer" }
+```
+
+### POST `/api/v1/import-lyrics`
+
+Request (with `Authorization: Bearer <token>`):
 
 ```json
 {
   "sourceType": "raw",
   "sourceValue": "Quiero bailar toda la noche",
   "title": "Mi Cancion",
-  "artist": "Artista",
-  "userId": 1
+  "artist": "Artista"
 }
 ```
 
@@ -171,9 +258,7 @@ Response:
 Request:
 
 ```json
-{
-  "songId": 10
-}
+{ "songId": 10 }
 ```
 
 Response (shape):

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ImportLyricsForm } from "@/components/ImportLyricsForm";
 import { AddToPlaylistMenu } from "@/components/AddToPlaylistMenu";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createPlaylist, listPlaylists, listSongs, type PlaylistSummary, type SongSummary } from "@/lib/api";
 
-const DEMO_USER_ID = 1;
-
 export default function DashboardPage() {
+  const { user, loading } = useRequireAuth();
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const refreshLists = useCallback(async () => {
     setLoadError(null);
     try {
-      const [songRes, plRes] = await Promise.all([listSongs(DEMO_USER_ID), listPlaylists(DEMO_USER_ID)]);
+      const [songRes, plRes] = await Promise.all([listSongs(), listPlaylists()]);
       setSongs(songRes.songs);
       setPlaylists(plRes.playlists);
     } catch (e) {
@@ -27,21 +27,23 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    void refreshLists();
-  }, [refreshLists]);
+    if (user) void refreshLists();
+  }, [user, refreshLists]);
 
   async function onCreatePlaylist(e: React.FormEvent) {
     e.preventDefault();
     if (!playlistName.trim()) return;
     setCreatingPlaylist(true);
     try {
-      await createPlaylist({ userId: DEMO_USER_ID, name: playlistName.trim() });
+      await createPlaylist({ name: playlistName.trim() });
       setPlaylistName("");
       await refreshLists();
     } finally {
       setCreatingPlaylist(false);
     }
   }
+
+  if (loading || !user) return null;
 
   return (
     <div className="space-y-6">
@@ -69,7 +71,7 @@ export default function DashboardPage() {
                       </span>
                     </Link>
                     <div className="min-w-0 shrink-0 lg:max-w-sm">
-                      <AddToPlaylistMenu userId={DEMO_USER_ID} songId={s.id} onPlaylistsChanged={refreshLists} />
+                      <AddToPlaylistMenu songId={s.id} onPlaylistsChanged={refreshLists} />
                     </div>
                   </div>
                 </li>

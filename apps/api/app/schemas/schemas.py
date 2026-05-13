@@ -1,12 +1,61 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+# bcrypt silently truncates passwords longer than 72 bytes.
+# Reject anything over that limit so users are never surprised.
+_BCRYPT_MAX_BYTES = 72
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=8, max_length=_BCRYPT_MAX_BYTES)
+
+    @field_validator("display_name")
+    @classmethod
+    def display_name_not_blank(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("display_name must not be blank")
+        return stripped
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, v: str) -> str:
+        if len(v.encode()) > _BCRYPT_MAX_BYTES:
+            raise ValueError(f"password must be at most {_BCRYPT_MAX_BYTES} characters")
+        return v
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    display_name: str
+    created_at: str
+
+
+# ---------------------------------------------------------------------------
+# Lyrics / Songs
+# ---------------------------------------------------------------------------
 
 class ImportLyricsRequest(BaseModel):
     sourceType: str = Field(pattern="^(url|raw)$")
     sourceValue: str
     title: str = "Untitled Song"
     artist: str | None = None
-    userId: int
 
 
 class ImportLyricsResponse(BaseModel):
@@ -37,8 +86,23 @@ class AnalyzeLyricsResponse(BaseModel):
     entries: list[VocabularyOut]
 
 
+class SongSummary(BaseModel):
+    id: int
+    title: str
+    artist: str | None
+    sourceType: str
+    createdAt: str
+
+
+class SongListResponse(BaseModel):
+    songs: list[SongSummary]
+
+
+# ---------------------------------------------------------------------------
+# Playlists
+# ---------------------------------------------------------------------------
+
 class CreatePlaylistRequest(BaseModel):
-    userId: int = Field(ge=1)
     name: str = Field(min_length=1, max_length=120)
     description: str | None = None
 
@@ -68,23 +132,6 @@ class PlaylistResponse(BaseModel):
     vocabularyCount: int
 
 
-class GenerateAnkiRequest(BaseModel):
-    songId: int
-    selectedVocabularyIds: list[int]
-
-
-class SongSummary(BaseModel):
-    id: int
-    title: str
-    artist: str | None
-    sourceType: str
-    createdAt: str
-
-
-class SongListResponse(BaseModel):
-    songs: list[SongSummary]
-
-
 class PlaylistSummary(BaseModel):
     id: int
     name: str
@@ -98,3 +145,12 @@ class PlaylistListResponse(BaseModel):
 
 class AddSongToPlaylistRequest(BaseModel):
     songId: int = Field(ge=1)
+
+
+# ---------------------------------------------------------------------------
+# Anki
+# ---------------------------------------------------------------------------
+
+class GenerateAnkiRequest(BaseModel):
+    songId: int
+    selectedVocabularyIds: list[int]
