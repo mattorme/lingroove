@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.routes.analysis import router as analysis_router
 from app.api.v1.routes.anki import router as anki_router
+from app.api.v1.routes.auth import router as auth_router
 from app.api.v1.routes.lyrics import router as lyrics_router
 from app.api.v1.routes.playlists import router as playlists_router
 from app.api.v1.routes.songs import router as songs_router
@@ -27,6 +28,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[item.strip() for item in settings.cors_origins.split(",")],
@@ -36,6 +39,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(lyrics_router, prefix="/api/v1", tags=["lyrics"])
 app.include_router(analysis_router, prefix="/api/v1", tags=["analysis"])
 app.include_router(anki_router, prefix="/api/v1", tags=["anki"])

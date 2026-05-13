@@ -39,11 +39,9 @@ function NewPlaylistInput({
 }
 
 export function AddToPlaylistMenu({
-  userId,
   songId,
   onPlaylistsChanged,
 }: {
-  userId: number;
   songId: number;
   onPlaylistsChanged?: () => void;
 }) {
@@ -54,9 +52,9 @@ export function AddToPlaylistMenu({
   const [msg, setMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const r = await listPlaylists(userId);
+    const r = await listPlaylists();
     setPlaylists(r.playlists);
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     void refresh().catch(() => setPlaylists([]));
@@ -84,7 +82,7 @@ export function AddToPlaylistMenu({
     setLoading(true);
     setMsg(null);
     try {
-      const pl = await createPlaylist({ userId, name });
+      const pl = await createPlaylist({ name });
       await addSongToPlaylist(pl.id, songId);
       setNewName("");
       setSelected("");

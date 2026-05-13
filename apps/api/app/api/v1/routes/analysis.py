@@ -3,7 +3,8 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.models import Lyric, VocabularyEntry
+from app.core.security import get_current_user
+from app.models.models import Lyric, Song, User, VocabularyEntry
 from app.schemas.schemas import AnalyzeLyricsRequest, AnalyzeLyricsResponse, VocabularyOut
 from app.services.nlp_pipeline import extract_vocabulary, group_by_pos
 
@@ -11,7 +12,17 @@ router = APIRouter()
 
 
 @router.post("/analyze-lyrics", response_model=AnalyzeLyricsResponse)
-def analyze_lyrics(payload: AnalyzeLyricsRequest, db: Session = Depends(get_db)):
+def analyze_lyrics(
+    payload: AnalyzeLyricsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    song = db.query(Song).filter(Song.id == payload.songId).first()
+    if song is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    if song.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorised")
+
     lyric = db.query(Lyric).filter(Lyric.song_id == payload.songId).order_by(Lyric.id.desc()).first()
     if lyric is None:
         raise HTTPException(status_code=404, detail="Lyrics not found for song")

@@ -1,6 +1,6 @@
 import { AnalyzeResponse } from "@/types/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+import { getStoredToken } from "@/context/AuthContext";
+import { API_BASE } from "@/lib/config";
 
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
 
@@ -11,7 +11,6 @@ const JSON_HEADERS = { "Content-Type": "application/json" } as const;
 async function parseError(res: Response, fallback: string): Promise<string> {
   try {
     const data = await res.json();
-    // Only surface string details; arrays/objects may contain validation internals
     if (typeof data?.detail === "string" && data.detail.length > 0) return data.detail;
   } catch {
     // ignore JSON parse errors
@@ -19,9 +18,18 @@ async function parseError(res: Response, fallback: string): Promise<string> {
   return fallback;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = getStoredToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers = {
+    ...authHeaders(),
+    ...(init?.headers as Record<string, string> | undefined),
+  };
   try {
-    return await fetch(`${API_BASE}${path}`, init);
+    return await fetch(`${API_BASE}${path}`, { ...init, headers });
   } catch {
     throw new Error("Cannot reach the API. Check that the backend is running and CORS is configured.");
   }
@@ -69,7 +77,55 @@ function filenameFromContentDisposition(header: string | null, fallback: string)
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Auth
+// ---------------------------------------------------------------------------
+
+export type AuthUser = {
+  id: number;
+  email: string;
+  display_name: string;
+  created_at: string;
+};
+
+export type TokenResponse = {
+  access_token: string;
+  token_type: string;
+};
+
+export async function signup(payload: {
+  email: string;
+  display_name: string;
+  password: string;
+}): Promise<TokenResponse> {
+  return apiPost<TokenResponse>("/auth/signup", payload, "Signup failed");
+}
+
+export async function login(payload: {
+  email: string;
+  password: string;
+}): Promise<TokenResponse> {
+  return apiPost<TokenResponse>("/auth/login", payload, "Invalid email or password");
+}
+
+export async function getMe(): Promise<AuthUser> {
+  return apiGet<AuthUser>("/auth/me", "Failed to load profile");
+}
+
+/**
+ * Fetch the current user's profile using an explicit token rather than the
+ * one stored in localStorage. Used immediately after login/signup, before the
+ * token has been committed to storage.
+ */
+export async function fetchMeWithToken(token: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to load profile");
+  return res.json() as Promise<AuthUser>;
+}
+
+// ---------------------------------------------------------------------------
+// Lyrics / Songs
 // ---------------------------------------------------------------------------
 
 export type ImportLyricsResponse = {
@@ -84,7 +140,6 @@ export async function importLyrics(payload: {
   sourceValue: string;
   title?: string;
   artist?: string;
-  userId: number;
 }): Promise<ImportLyricsResponse> {
   return apiPost<ImportLyricsResponse>("/import-lyrics", payload, "Failed to import lyrics");
 }
@@ -108,9 +163,13 @@ export type SongSummary = {
   createdAt: string;
 };
 
-export async function listSongs(userId: number): Promise<{ songs: SongSummary[] }> {
-  return apiGet(`/songs?userId=${userId}`, "Failed to load songs");
+export async function listSongs(): Promise<{ songs: SongSummary[] }> {
+  return apiGet(`/songs`, "Failed to load songs");
 }
+
+// ---------------------------------------------------------------------------
+// Playlists
+// ---------------------------------------------------------------------------
 
 export type PlaylistSummary = {
   id: number;
@@ -119,12 +178,11 @@ export type PlaylistSummary = {
   songCount: number;
 };
 
-export async function listPlaylists(userId: number): Promise<{ playlists: PlaylistSummary[] }> {
-  return apiGet(`/playlists?userId=${userId}`, "Failed to load playlists");
+export async function listPlaylists(): Promise<{ playlists: PlaylistSummary[] }> {
+  return apiGet(`/playlists`, "Failed to load playlists");
 }
 
 export async function createPlaylist(payload: {
-  userId: number;
   name: string;
   description?: string;
 }): Promise<{ id: number; name: string }> {
@@ -163,6 +221,17 @@ export async function addSongToPlaylist(playlistId: number, songId: number): Pro
 
 export async function removeSongFromPlaylist(playlistId: number, songId: number): Promise<void> {
   return apiDelete(`/playlist/${playlistId}/songs/${songId}`, "Failed to remove song from playlist");
+}
+
+export async function generateAnkiCsv(songId: number, selectedVocabularyIds: number[]): Promise<void> {
+  const res = await apiFetch("/generate-anki", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ songId, selectedVocabularyIds }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to generate Anki CSV"));
+  const blob = await res.blob();
+  triggerBlobDownload(blob, "lingroove-anki.csv");
 }
 
 export async function exportPlaylistCsv(playlistId: number, playlistName: string): Promise<void> {
