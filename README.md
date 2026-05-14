@@ -75,7 +75,7 @@ SECRET_KEY=<paste the output here>
 - **Timing-safe login:** The login endpoint always runs bcrypt (real or dummy) so response time does not reveal whether an email is registered.
 - **Ownership enforcement:** Every route scopes queries to the authenticated user. Accessing another user's resource by ID returns 403.
 - **Secrets:** Never commit `.env`. Use strong database credentials and rotate them in production.
-- **Lyrics URL import:** The backend only allows `http`/`https` and blocks obvious loopback, private, and link-local hosts. A hostname that resolves to an internal address is not fully blocked unless you add DNS-resolution checks or proxy the fetch.
+- **Lyrics URL import:** The backend only allows `http`/`https` and blocks obvious loopback, private, and link-local hosts. A hostname that resolves to an internal address is not fully blocked unless you add DNS-resolution checks or proxy the fetch. Unsupported sites (JS-rendered or bot-protected) are rejected early with a clear error rather than silently returning garbage text.
 - **Error responses:** Import failures return short, fixed client messages; full tracebacks are logged server-side only.
 - **CORS:** `CORS_ORIGINS` should list explicit frontend origins. Avoid pairing wildcard origins with credentials in production.
 
@@ -152,6 +152,34 @@ cd apps/api
 source .venv/bin/activate
 alembic upgrade head
 ```
+
+## Lyrics Import
+
+Lyrics can be imported as raw text or by providing a URL. When importing from a URL the backend uses a two-tier extraction strategy to return only the lyric content, not page chrome, navigation, or ads.
+
+**Tier 1 — site-specific CSS selectors**  
+For known lyrics sites the backend targets the exact container element. This gives the cleanest result. Supported sites:
+
+| Site | Notes |
+|---|---|
+| genius.com | Best coverage for Latin/Spanish music. Genius header metadata (contributor count, language label, title line) is stripped automatically. |
+| azlyrics.com | |
+| lyrics.com | |
+| songlyrics.com | |
+| metrolyrics.com | |
+
+**Tier 2 — trafilatura fallback**  
+For any other site, [trafilatura](https://trafilatura.readthedocs.io/) extracts the main body text by stripping boilerplate (nav, footers, sidebars, ads). This is language-agnostic and works for most standard lyrics pages.
+
+**Unsupported sites**  
+Some sites cannot be scraped server-side and return an immediate `400` with a suggested alternative:
+
+| Site | Reason |
+|---|---|
+| musixmatch.com | Lyrics are JS-rendered; the static HTML contains no lyric content |
+| letras.com / letras.mus.br | Akamai WAF blocks all automated requests |
+
+To add support for a new site, add a CSS selector entry to `_SITE_SELECTORS` in `apps/api/app/services/lyrics_importer.py`. To mark a site as unsupported, add it to `_UNSUPPORTED_SITES` in the same file.
 
 ## Core API Endpoints
 
