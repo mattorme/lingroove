@@ -13,3 +13,4 @@ build/
 coverage/
 apps/api/alembic.ini
 apps/api/alembic/versions/__pycache__/
+CLAUDE.md
