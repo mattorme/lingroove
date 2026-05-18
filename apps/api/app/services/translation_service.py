@@ -131,7 +131,7 @@ _translation_cache: dict[str, str] = {}
 
 
 def translate_spanish_lemma(lemma: str) -> str:
-    """Translate a Spanish lemma (lowercased) to a short English gloss."""
+    """Translate a single Spanish lemma to a short English gloss."""
     w = lemma.lower().strip()
     if not w:
         return ""
@@ -155,6 +155,62 @@ def translate_spanish_lemma(lemma: str) -> str:
         pass
 
     return _STATIC_LEXICON.get(w, "English gloss unavailable")
+
+
+def translate_batch(lemmas: list[str]) -> dict[str, str]:
+    """Translate a list of Spanish lemmas efficiently.
+
+    Resolves from the static lexicon and cache first, then translates any
+    remaining words concurrently instead of sequentially.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    result: dict[str, str] = {}
+    to_translate: list[str] = []
+
+    for lemma in lemmas:
+        w = lemma.lower().strip()
+        if not w:
+            result[lemma] = ""
+        elif w in _STATIC_LEXICON:
+            result[lemma] = _STATIC_LEXICON[w]
+        elif w in _translation_cache:
+            result[lemma] = _translation_cache[w]
+        else:
+            to_translate.append(w)
+
+    if not to_translate:
+        return result
+
+    provider = (settings.translation_provider or "google").lower()
+    if provider in ("stub", "offline", "static"):
+        for w in to_translate:
+            result[w] = _STATIC_LEXICON.get(w, "English gloss unavailable")
+        return result
+
+    def _translate_one(word: str) -> tuple[str, str]:
+        try:
+            from deep_translator import GoogleTranslator
+
+            en = GoogleTranslator(source="es", target="en").translate(word)
+            translation = en if en else _STATIC_LEXICON.get(word, "English gloss unavailable")
+        except Exception:
+            translation = _STATIC_LEXICON.get(word, "English gloss unavailable")
+        return word, translation
+
+    try:
+        max_workers = min(len(to_translate), 10)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_translate_one, w): w for w in to_translate}
+            for future in as_completed(futures):
+                word, translation = future.result()
+                _translation_cache[word] = translation
+                result[word] = translation
+    except Exception:
+        for w in to_translate:
+            result[w] = _STATIC_LEXICON.get(w, "English gloss unavailable")
+
+    return result
 
 
 # Backwards-compatible name for nlp_pipeline
