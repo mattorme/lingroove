@@ -135,6 +135,10 @@ export type ImportLyricsResponse = {
   detectedLanguage: string;
 };
 
+export async function fetchSongMetadata(url: string): Promise<{ title: string | null; artist: string | null }> {
+  return apiGet(`/song-metadata?url=${encodeURIComponent(url)}`, "Failed to fetch song metadata");
+}
+
 export async function importLyrics(payload: {
   sourceType: "url" | "raw";
   sourceValue: string;
