@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ from app.schemas.schemas import (
     PlaylistSummary,
     RenamePlaylistRequest,
 )
-from app.services.anki_exporter import iter_anki_csv_bytes, safe_playlist_export_filename, vocabulary_entry_to_row_dict
+from app.services.anki_exporter import generate_anki_package, iter_anki_csv_bytes, safe_playlist_export_filename, vocabulary_entry_to_row_dict
 
 router = APIRouter()
 
@@ -220,6 +220,28 @@ def export_playlist_csv(
     return StreamingResponse(
         iter_anki_csv_bytes(row_stream()),
         media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/playlist/{playlist_id}/export-anki-pkg")
+def export_playlist_anki_pkg(
+    playlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    playlist = _get_playlist_or_404(db, playlist_id)
+    _assert_owner(playlist, current_user)
+    rows = list(_playlist_vocab_rows(db, playlist_id))
+    if not rows:
+        raise HTTPException(status_code=404, detail="No vocabulary in this playlist")
+    deck_name = f"Lingroove – {playlist.name}"
+    pkg_bytes = generate_anki_package(rows, deck_name=deck_name)
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "" for c in playlist.name).strip() or "playlist"
+    filename = f"lingroove-{safe_name}.apkg"
+    return Response(
+        content=pkg_bytes,
+        media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

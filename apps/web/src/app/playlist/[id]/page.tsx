@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   deletePlaylist,
+  exportPlaylistAnkiPackage,
   exportPlaylistCsv,
   getPlaylist,
   removeSongFromPlaylist,
@@ -21,7 +22,7 @@ export default function PlaylistPage() {
   const [error, setError] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"anki" | "csv" | null>(null);
   const [busySongId, setBusySongId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -71,15 +72,19 @@ export default function PlaylistPage() {
     }
   }
 
-  async function onExport() {
+  async function onExport(format: "anki" | "csv") {
     if (!data) return;
-    setExporting(true);
+    setExporting(format);
     try {
-      await exportPlaylistCsv(playlistId, data.name);
+      if (format === "anki") {
+        await exportPlaylistAnkiPackage(playlistId, data.name);
+      } else {
+        await exportPlaylistCsv(playlistId, data.name);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed.");
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
 
@@ -119,8 +124,21 @@ export default function PlaylistPage() {
             <p className="mt-2 text-sm text-accent">Vocabulary rows across playlist: {data.vocabularyCount}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="button-primary text-sm" disabled={exporting} onClick={onExport}>
-              {exporting ? "Exporting…" : "Export CSV"}
+            <button
+              type="button"
+              className="button-primary text-sm"
+              disabled={exporting !== null}
+              onClick={() => onExport("anki")}
+            >
+              {exporting === "anki" ? "Exporting…" : "Export Anki Deck"}
+            </button>
+            <button
+              type="button"
+              className="button-secondary text-sm"
+              disabled={exporting !== null}
+              onClick={() => onExport("csv")}
+            >
+              {exporting === "csv" ? "Exporting…" : "Export CSV"}
             </button>
             <button type="button" className="button-secondary text-sm text-red-300" onClick={onDelete}>
               Delete playlist
