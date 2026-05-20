@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
+    # OpenAI (used as a slang-aware translation fallback / provider)
+    openai_api_key: str = ""
+
     # Cloudflare R2 (S3-compatible object storage for user avatars)
     r2_account_id: str = ""
     r2_access_key_id: str = ""

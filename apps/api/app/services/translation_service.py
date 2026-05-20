@@ -1,8 +1,22 @@
-"""Spanish lemma/surface → English gloss. Uses a small offline lexicon plus optional Google (deep-translator)."""
+"""Spanish lemma/surface → English gloss.
+
+Providers (set via TRANSLATION_PROVIDER env var):
+  google   — Google Translate via deep-translator (default)
+  openai   — OpenAI GPT with a music/slang-aware prompt
+  stub/offline/static — offline lexicon only
+
+Slang fallback: when TRANSLATION_PROVIDER=google and an OPENAI_API_KEY is
+configured, any word that Google returns unchanged (its signal for "unknown")
+is automatically retried with OpenAI.
+"""
 
 from __future__ import annotations
 
+import logging
+
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Offline lexicon for tests, rate limits, and stub/offline translation modes
 _STATIC_LEXICON: dict[str, str] = {
@@ -129,6 +143,45 @@ _STATIC_LEXICON: dict[str, str] = {
 
 _translation_cache: dict[str, str] = {}
 
+_OPENAI_SYSTEM_PROMPT = (
+    "You are a Spanish-to-English translator specialising in music lyrics, "
+    "urban slang, and colloquial Latin American and Spanish speech. "
+    "When given a single Spanish word or short phrase, reply with only a concise "
+    "English gloss (2–6 words). Include the slang/informal meaning when relevant. "
+    "Never explain or add punctuation beyond the gloss itself."
+)
+
+
+def _translate_with_openai(word: str) -> str | None:
+    """Call OpenAI to translate a single word/phrase. Returns None on failure."""
+    api_key = settings.openai_api_key
+    if not api_key:
+        return None
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _OPENAI_SYSTEM_PROMPT},
+                {"role": "user", "content": word},
+            ],
+            max_tokens=20,
+            temperature=0,
+        )
+        gloss = response.choices[0].message.content
+        if gloss:
+            return gloss.strip()
+    except Exception as exc:
+        logger.warning("OpenAI translation failed for %r: %s", word, exc)
+    return None
+
+
+def _google_returned_input(word: str, result: str) -> bool:
+    """True when Google could not translate and echoed the input back."""
+    return result.lower().strip() == word.lower().strip()
+
 
 def translate_spanish_lemma(lemma: str) -> str:
     """Translate a single Spanish lemma to a short English gloss."""
@@ -144,10 +197,29 @@ def translate_spanish_lemma(lemma: str) -> str:
     if provider in ("stub", "offline", "static"):
         return _STATIC_LEXICON.get(w, "English gloss unavailable")
 
+    if provider == "openai":
+        result = _translate_with_openai(w)
+        if result:
+            _translation_cache[w] = result
+            return result
+        return _STATIC_LEXICON.get(w, "English gloss unavailable")
+
+    # Google path (default)
     try:
         from deep_translator import GoogleTranslator
 
         en = GoogleTranslator(source="es", target="en").translate(w)
+        if en and not _google_returned_input(w, en):
+            _translation_cache[w] = en
+            return en
+
+        # Google echoed the word back — try OpenAI slang fallback
+        if settings.openai_api_key:
+            slang = _translate_with_openai(w)
+            if slang:
+                _translation_cache[w] = slang
+                return slang
+
         if en:
             _translation_cache[w] = en
             return en
@@ -189,14 +261,7 @@ def translate_batch(lemmas: list[str]) -> dict[str, str]:
         return result
 
     def _translate_one(word: str) -> tuple[str, str]:
-        try:
-            from deep_translator import GoogleTranslator
-
-            en = GoogleTranslator(source="es", target="en").translate(word)
-            translation = en if en else _STATIC_LEXICON.get(word, "English gloss unavailable")
-        except Exception:
-            translation = _STATIC_LEXICON.get(word, "English gloss unavailable")
-        return word, translation
+        return word, translate_spanish_lemma(word)
 
     try:
         max_workers = min(len(to_translate), 10)
@@ -211,6 +276,22 @@ def translate_batch(lemmas: list[str]) -> dict[str, str]:
             result[w] = _STATIC_LEXICON.get(w, "English gloss unavailable")
 
     return result
+
+
+def seed_cache_from_entries(entries: list[tuple[str, str]]) -> None:
+    """Pre-populate the in-memory cache from existing DB translations.
+
+    Call this before re-analysing a song so that words already translated are
+    served from cache rather than making new API calls.
+
+    Args:
+        entries: list of (word, translation) pairs, e.g. from VocabularyEntry
+                 rows (both lemma and surface-form conjugations).
+    """
+    for word, translation in entries:
+        w = word.lower().strip()
+        if w and translation and translation != "English gloss unavailable":
+            _translation_cache.setdefault(w, translation)
 
 
 # Backwards-compatible name for nlp_pipeline

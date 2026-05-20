@@ -1,4 +1,5 @@
-from collections import defaultdict
+import time
+from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete
@@ -9,8 +10,36 @@ from app.core.security import get_current_user
 from app.models.models import Lyric, Song, User, VocabularyEntry
 from app.schemas.schemas import AnalyzeLyricsRequest, AnalyzeLyricsResponse, VocabularyOut
 from app.services.nlp_pipeline import extract_vocabulary
+from app.services.translation_service import seed_cache_from_entries
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Per-user rate limiting (in-memory sliding window)
+# Max ANALYZE_LIMIT requests per ANALYZE_WINDOW_SECONDS per user.
+# ---------------------------------------------------------------------------
+ANALYZE_LIMIT = 20
+ANALYZE_WINDOW_SECONDS = 3600  # 1 hour
+
+_user_analyze_timestamps: dict[int, deque] = defaultdict(deque)
+
+
+def _check_rate_limit(user_id: int) -> None:
+    now = time.monotonic()
+    window_start = now - ANALYZE_WINDOW_SECONDS
+    timestamps = _user_analyze_timestamps[user_id]
+
+    # Drop timestamps outside the current window
+    while timestamps and timestamps[0] < window_start:
+        timestamps.popleft()
+
+    if len(timestamps) >= ANALYZE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Analysis limit reached. You can analyse up to {ANALYZE_LIMIT} songs per hour.",
+        )
+
+    timestamps.append(now)
 
 
 @router.post("/analyze-lyrics", response_model=AnalyzeLyricsResponse)
@@ -28,6 +57,18 @@ def analyze_lyrics(
     lyric = db.query(Lyric).filter(Lyric.song_id == payload.songId).order_by(Lyric.id.desc()).first()
     if lyric is None:
         raise HTTPException(status_code=404, detail="Lyrics not found for song")
+
+    _check_rate_limit(current_user.id)
+
+    # Seed the translation cache from existing entries so that re-analysis
+    # of the same song doesn't make redundant API calls for already-known words.
+    existing = db.query(VocabularyEntry).filter(VocabularyEntry.song_id == payload.songId).all()
+    cache_pairs: list[tuple[str, str]] = []
+    for row in existing:
+        cache_pairs.append((row.lemma, row.english_translation))
+        if row.original_word != row.lemma and row.conjugated_translation:
+            cache_pairs.append((row.original_word, row.conjugated_translation))
+    seed_cache_from_entries(cache_pairs)
 
     db.execute(delete(VocabularyEntry).where(VocabularyEntry.song_id == payload.songId))
     extracted = extract_vocabulary(lyric.clean_text)
