@@ -3,9 +3,32 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { ImportLyricsForm } from "@/components/ImportLyricsForm";
+import { PlaylistArtwork } from "@/components/PlaylistArtwork";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { listPlaylists, listSongs, songSourceLabel, type PlaylistSummary, type SongSummary } from "@/lib/api";
+import {
+  addSongToPlaylist,
+  listPlaylists,
+  listSongs,
+  songSourceLabel,
+  type PlaylistSummary,
+  type SongSummary,
+} from "@/lib/api";
 
 const HOW_IT_WORKS = [
   { n: "1", text: "Paste a lyrics URL or raw text below" },
@@ -13,11 +36,139 @@ const HOW_IT_WORKS = [
   { n: "3", text: "Export selected words as Anki flashcards" },
 ];
 
+function DraggableSongRow({ song }: { song: SongSummary }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `song-${song.id}`,
+    data: { songId: song.id },
+  });
+
+  return (
+    <li
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`group -mx-2 cursor-grab select-none rounded-lg outline-none transition-all active:cursor-grabbing ${
+        isDragging
+          ? "scale-[0.98] bg-white/[0.03] opacity-40"
+          : "hover:bg-white/[0.06]"
+      }`}
+    >
+      <Link
+        href={`/analysis/${song.id}`}
+        className="flex items-center gap-3 px-2 py-2.5"
+      >
+        {song.artworkUrl ? (
+          <div className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-md transition-transform ${isDragging ? "" : "group-hover:scale-105"}`}>
+            <Image
+              src={song.artworkUrl}
+              alt={song.title}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+        ) : (
+          <div className="h-9 w-9 shrink-0 rounded-md bg-white/[0.06]" />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">
+            {song.title}
+            {song.artist ? (
+              <span className="font-normal text-textSecondary"> · {song.artist}</span>
+            ) : null}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-textSecondary">
+            {songSourceLabel(song.sourceType)} · {new Date(song.createdAt).toLocaleString()}
+          </p>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+function DroppablePlaylistRow({
+  playlist,
+  isActive,
+  feedback,
+}: {
+  playlist: PlaylistSummary;
+  isActive: boolean;
+  feedback: string | null;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `playlist-${playlist.id}`,
+    data: { playlistId: playlist.id },
+  });
+
+  const highlighted = isOver || !!feedback;
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{
+        backgroundColor: highlighted
+          ? "rgb(168 85 247 / 0.35)"
+          : isActive
+          ? "rgba(255,255,255,0.03)"
+          : undefined,
+        transform: highlighted
+          ? "scale(1.03)"
+          : isActive
+          ? "scale(0.99)"
+          : undefined,
+      }}
+      className={`-mx-2 rounded-xl transition-all duration-150 ${!highlighted && !isActive ? "hover:bg-white/[0.06]" : ""}`}
+    >
+      <Link
+        href={`/playlist/${playlist.id}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="flex items-center gap-3 px-2 py-2.5"
+      >
+        <div
+          className="transition-transform duration-150"
+          style={{ transform: highlighted ? "scale(1.1)" : undefined }}
+        >
+          <PlaylistArtwork urls={playlist.artworkUrls} size={9} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{playlist.name}</p>
+          <p className="text-xs text-textSecondary">
+            {playlist.songCount} {playlist.songCount === 1 ? "song" : "songs"}
+          </p>
+        </div>
+        {feedback ? (
+          <span className="shrink-0 text-xs font-medium text-green-400">
+            {feedback}
+          </span>
+        ) : null}
+      </Link>
+    </li>
+  );
+}
+
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeSong, setActiveSong] = useState<SongSummary | null>(null);
+  const [dropFeedback, setDropFeedback] = useState<{
+    playlistId: number;
+    msg: string;
+  } | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  // Prefer pointer-within (cursor inside row) for hover feedback. If the
+  // cursor isn't strictly inside any row (between rows etc.), fall back to
+  // rect intersection so drops still register.
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointer = pointerWithin(args);
+    if (pointer.length > 0) return pointer;
+    return rectIntersection(args);
+  }, []);
 
   const refreshLists = useCallback(async () => {
     setLoadError(null);
@@ -34,6 +185,29 @@ export default function DashboardPage() {
     if (user) void refreshLists();
   }, [user, refreshLists]);
 
+  function handleDragStart(e: DragStartEvent) {
+    const songId = e.active.data.current?.songId as number | undefined;
+    const song = songs.find((s) => s.id === songId) ?? null;
+    setActiveSong(song);
+  }
+
+  async function handleDragEnd(e: DragEndEvent) {
+    setActiveSong(null);
+    const songId = e.active.data.current?.songId as number | undefined;
+    const playlistId = e.over?.data.current?.playlistId as number | undefined;
+    if (!songId || !playlistId) return;
+    try {
+      await addSongToPlaylist(playlistId, songId);
+      setDropFeedback({ playlistId, msg: "Added!" });
+      void refreshLists();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to add";
+      setDropFeedback({ playlistId, msg });
+    } finally {
+      setTimeout(() => setDropFeedback(null), 3000);
+    }
+  }
+
   if (loading || !user) return null;
 
   const hasSongs = songs.length > 0;
@@ -42,7 +216,9 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <section>
         <h1 className="text-3xl font-semibold">Add Songs</h1>
-        <p className="text-textSecondary">Import lyrics via URL or raw text to start analysis.</p>
+        <p className="text-textSecondary">
+          Import lyrics via URL or raw text to start analysis.
+        </p>
       </section>
 
       {!hasSongs && (
@@ -66,75 +242,90 @@ export default function DashboardPage() {
       {loadError ? <p className="text-sm text-red-400">{loadError}</p> : null}
 
       {hasSongs && (
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="card">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Recent Songs</h2>
-              <Link href="/songs" className="text-xs text-accent underline">
-                View all
-              </Link>
-            </div>
-            <ul className="divide-y divide-white/5">
-              {songs.map((s) => (
-                <li key={s.id} className="py-2.5 first:pt-0 last:pb-0">
-                  <Link href={`/analysis/${s.id}`} className="flex items-center gap-3 transition hover:text-accent">
-                    {s.artworkUrl ? (
-                      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md">
-                        <Image
-                          src={s.artworkUrl}
-                          alt={s.title}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-9 w-9 shrink-0 rounded-md bg-white/[0.06]" />
-                    )}
-                    <div className="min-w-0">
-                      <span className="font-medium">{s.title}</span>
-                      {s.artist ? <span className="text-textSecondary"> · {s.artist}</span> : null}
-                      <span className="mt-0.5 block text-xs text-textSecondary">
-                        {songSourceLabel(s.sourceType)} · {new Date(s.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="card">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Playlists</h2>
-              <Link href="/playlists" className="text-xs text-accent underline">
-                Manage
-              </Link>
-            </div>
-            {playlists.length === 0 ? (
-              <p className="text-sm text-textSecondary">
-                No playlists yet.{" "}
-                <Link href="/playlists" className="text-accent underline">
-                  Create one
-                </Link>{" "}
-                to organise your songs.
-              </p>
-            ) : (
-              <ul className="divide-y divide-white/5">
-                {playlists.map((p) => (
-                  <li key={p.id} className="py-2.5 first:pt-0 last:pb-0">
-                    <Link href={`/playlist/${p.id}`} className="block transition hover:text-accent">
-                      <span className="font-medium">{p.name}</span>
-                      <span className="ml-2 text-xs text-textSecondary">
-                        {p.songCount} {p.songCount === 1 ? "song" : "songs"}
-                      </span>
-                    </Link>
-                  </li>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveSong(null)}
+        >
+          <section className="grid items-stretch gap-4 md:grid-cols-2">
+            {/* ── Recent Songs (draggable) ── */}
+            <div className="card">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Recent Songs</h2>
+                <Link href="/songs" className="text-xs text-accent underline">
+                  View all
+                </Link>
+              </div>
+              <ul className="space-y-0.5">
+                {songs.map((s) => (
+                  <DraggableSongRow key={s.id} song={s} />
                 ))}
               </ul>
-            )}
-          </div>
-        </section>
+            </div>
+
+            {/* ── Playlists (droppable) ── */}
+            <div className="card">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Playlists</h2>
+                <Link href="/playlists" className="text-xs text-accent underline">
+                  Manage
+                </Link>
+              </div>
+              {playlists.length === 0 ? (
+                <p className="text-sm text-textSecondary">
+                  No playlists yet.{" "}
+                  <Link href="/playlists" className="text-accent underline">
+                    Create one
+                  </Link>{" "}
+                  to organise your songs.
+                </p>
+              ) : (
+                <ul className="space-y-0.5">
+                  {playlists.map((p) => (
+                    <DroppablePlaylistRow
+                      key={p.id}
+                      playlist={p}
+                      isActive={activeSong !== null}
+                      feedback={
+                        dropFeedback?.playlistId === p.id
+                          ? dropFeedback.msg
+                          : null
+                      }
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
+            {activeSong ? (
+              <div className="flex w-56 cursor-grabbing items-center gap-3 rounded-xl border border-white/15 bg-surface px-3 py-2.5 shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                {activeSong.artworkUrl ? (
+                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md shadow-md">
+                    <Image
+                      src={activeSong.artworkUrl}
+                      alt={activeSong.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="h-9 w-9 shrink-0 rounded-md bg-white/[0.06]" />
+                )}
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="truncate font-medium">{activeSong.title}</p>
+                  {activeSong.artist ? (
+                    <p className="truncate text-xs text-textSecondary">{activeSong.artist}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );
