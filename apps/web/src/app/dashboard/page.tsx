@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ImportLyricsForm } from "@/components/ImportLyricsForm";
 import { AddToPlaylistMenu } from "@/components/AddToPlaylistMenu";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import { createPlaylist, listPlaylists, listSongs, type PlaylistSummary, type SongSummary } from "@/lib/api";
+import { createPlaylist, listPlaylists, listSongs, songSourceLabel, type PlaylistSummary, type SongSummary } from "@/lib/api";
 
 export default function DashboardPage() {
   const { user, loading } = useRequireAuth();
@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const refreshLists = useCallback(async () => {
     setLoadError(null);
     try {
-      const [songRes, plRes] = await Promise.all([listSongs(), listPlaylists()]);
+      const [songRes, plRes] = await Promise.all([listSongs(5), listPlaylists()]);
       setSongs(songRes.songs);
       setPlaylists(plRes.playlists);
     } catch (e) {
@@ -55,7 +55,12 @@ export default function DashboardPage() {
       {loadError ? <p className="text-sm text-red-400">{loadError}</p> : null}
       <section className="grid gap-4 md:grid-cols-2">
         <div className="card">
-          <h2 className="mb-3 text-lg font-semibold">Recent Songs</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Recent Songs</h2>
+            <Link href="/songs" className="text-xs text-accent underline">
+              View all
+            </Link>
+          </div>
           {songs.length === 0 ? (
             <p className="text-sm text-textSecondary">No songs yet. Import lyrics above — they will show here when you return to the dashboard.</p>
           ) : (
@@ -67,7 +72,7 @@ export default function DashboardPage() {
                       <span className="font-medium">{s.title}</span>
                       {s.artist ? <span className="text-textSecondary"> · {s.artist}</span> : null}
                       <span className="mt-0.5 block text-xs text-textSecondary">
-                        {s.sourceType === "url" ? "URL" : "Raw"} · {new Date(s.createdAt).toLocaleString()}
+                        {songSourceLabel(s.sourceType)} · {new Date(s.createdAt).toLocaleString()}
                       </span>
                     </Link>
                     <div className="min-w-0 shrink-0 lg:max-w-sm">

@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -12,8 +12,13 @@ router = APIRouter()
 
 
 @router.get("/songs", response_model=SongListResponse)
-def list_songs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    rows = db.query(Song).filter(Song.user_id == current_user.id).order_by(Song.created_at.desc()).all()
+def list_songs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int | None = Query(default=None, ge=1, le=200),
+):
+    query = db.query(Song).filter(Song.user_id == current_user.id).order_by(Song.created_at.desc())
+    rows = query.limit(limit).all() if limit is not None else query.all()
     return SongListResponse(
         songs=[
             SongSummary(
