@@ -176,6 +176,10 @@ export async function listSongs(limit?: number): Promise<{ songs: SongSummary[] 
   return apiGet(path, "Failed to load songs");
 }
 
+export async function deleteSong(songId: number): Promise<void> {
+  return apiDelete(`/songs/${songId}`, "Failed to delete song");
+}
+
 // ---------------------------------------------------------------------------
 // Playlists
 // ---------------------------------------------------------------------------

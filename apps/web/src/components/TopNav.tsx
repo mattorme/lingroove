@@ -23,7 +23,7 @@ export function TopNav() {
           {!loading && user ? (
             <>
               <Link href="/dashboard" className="hover:text-textPrimary">
-                Dashboard
+                Add Songs
               </Link>
               <Link href="/songs" className="hover:text-textPrimary">
                 Songs

@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -31,6 +31,22 @@ def list_songs(
             for s in rows
         ]
     )
+
+
+@router.delete("/songs/{song_id}", status_code=204)
+def delete_song(
+    song_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    song = db.query(Song).filter(Song.id == song_id).first()
+    if song is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    if song.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorised")
+    db.delete(song)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/songs/{song_id}/analysis", response_model=AnalyzeLyricsResponse)
