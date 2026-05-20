@@ -48,7 +48,7 @@ export default function PlaylistsPage() {
         <p className="text-textSecondary">
           Organize imported songs. Add songs from the{" "}
           <Link href="/dashboard" className="text-accent underline">
-            dashboard
+            Add Songs
           </Link>{" "}
           or a song&apos;s analysis page, then export vocabulary as CSV.
         </p>
@@ -71,7 +71,7 @@ export default function PlaylistsPage() {
       <section className="card">
         <h2 className="mb-3 text-lg font-semibold">Your playlists</h2>
         {playlists.length === 0 ? (
-          <p className="text-sm text-textSecondary">No playlists yet. Create one above, then add songs from the dashboard or analysis view.</p>
+          <p className="text-sm text-textSecondary">No playlists yet. Create one above, then add songs from the Add Songs page or a song&apos;s analysis view.</p>
         ) : (
           <ul className="space-y-2">
             {playlists.map((p) => (

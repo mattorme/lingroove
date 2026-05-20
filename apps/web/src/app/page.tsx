@@ -10,7 +10,7 @@ export default function HomePage() {
           Import lyrics, extract vocabulary with NLP, organize songs in playlists, and export Anki-ready flashcards.
         </p>
         <Link href="/dashboard" className="button-primary inline-block">
-          Open Dashboard
+          Get Started
         </Link>
       </div>
       <div className="card min-h-64 bg-gradient-to-br from-surface to-surfaceSoft">

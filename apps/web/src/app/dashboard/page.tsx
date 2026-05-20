@@ -48,7 +48,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <section>
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
+        <h1 className="text-3xl font-semibold">Add Songs</h1>
         <p className="text-textSecondary">Import lyrics via URL or raw text to start analysis.</p>
       </section>
       <ImportLyricsForm />
@@ -62,7 +62,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           {songs.length === 0 ? (
-            <p className="text-sm text-textSecondary">No songs yet. Import lyrics above — they will show here when you return to the dashboard.</p>
+            <p className="text-sm text-textSecondary">No songs yet. Import lyrics above to get started.</p>
           ) : (
             <ul className="space-y-3">
               {songs.map((s) => (
