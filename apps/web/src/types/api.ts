@@ -3,6 +3,7 @@ export type VocabularyEntry = {
   originalWord: string;
   infinitiveForm: string | null;
   englishTranslation: string;
+  conjugatedTranslation: string | null;
   contextSentence: string;
   partOfSpeech: "verb" | "noun" | "adjective" | string;
   isSelected: boolean;

@@ -48,18 +48,7 @@ def get_saved_analysis(
         .order_by(VocabularyEntry.id.asc())
         .all()
     )
-    entries = [
-        VocabularyOut(
-            id=r.id,
-            originalWord=r.original_word,
-            infinitiveForm=r.infinitive_form,
-            englishTranslation=r.english_translation,
-            contextSentence=r.context_line,
-            partOfSpeech=r.part_of_speech,
-            isSelected=r.is_selected,
-        )
-        for r in rows
-    ]
+    entries = [VocabularyOut.from_orm_row(r) for r in rows]
     grouped: dict[str, list[VocabularyOut]] = defaultdict(list)
     for e in entries:
         grouped[e.partOfSpeech].append(e)

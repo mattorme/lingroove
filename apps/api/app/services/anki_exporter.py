@@ -6,6 +6,7 @@ from collections.abc import Iterator
 ANKI_CSV_COLUMNS = [
     "Spanish Word",
     "English Translation",
+    "Infinitive Translation",
     "Context Sentence",
     "Part of Speech",
     "Infinitive Form (if applicable)",
@@ -17,6 +18,7 @@ def vocabulary_entry_to_row_dict(entry) -> dict:
     return {
         "original_word": entry.original_word,
         "english_translation": entry.english_translation,
+        "conjugated_translation": getattr(entry, "conjugated_translation", None),
         "context_line": entry.context_line,
         "part_of_speech": entry.part_of_speech,
         "infinitive_form": entry.infinitive_form,
@@ -24,9 +26,12 @@ def vocabulary_entry_to_row_dict(entry) -> dict:
 
 
 def row_dict_to_anki_cells(row: dict) -> list[str]:
+    conjugated = row.get("conjugated_translation") or ""
+    infinitive = row["english_translation"]
     return [
         row["original_word"],
-        row["english_translation"],
+        conjugated or infinitive,
+        infinitive if conjugated else "",
         row["context_line"],
         row["part_of_speech"],
         row["infinitive_form"] or "",

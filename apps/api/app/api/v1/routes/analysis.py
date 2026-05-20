@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
@@ -6,7 +8,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Lyric, Song, User, VocabularyEntry
 from app.schemas.schemas import AnalyzeLyricsRequest, AnalyzeLyricsResponse, VocabularyOut
-from app.services.nlp_pipeline import extract_vocabulary, group_by_pos
+from app.services.nlp_pipeline import extract_vocabulary
 
 router = APIRouter()
 
@@ -37,38 +39,15 @@ def analyze_lyrics(
         saved.append(row)
     db.commit()
 
-    entries = [
-        VocabularyOut(
-            id=row.id,
-            originalWord=row.original_word,
-            infinitiveForm=row.infinitive_form,
-            englishTranslation=row.english_translation,
-            contextSentence=row.context_line,
-            partOfSpeech=row.part_of_speech,
-            isSelected=row.is_selected,
-        )
-        for row in saved
-    ]
-    grouped_raw = group_by_pos(extracted)
-    grouped = {
-        key: [
-            VocabularyOut(
-                id=row.id,
-                originalWord=row.original_word,
-                infinitiveForm=row.infinitive_form,
-                englishTranslation=row.english_translation,
-                contextSentence=row.context_line,
-                partOfSpeech=row.part_of_speech,
-                isSelected=row.is_selected,
-            )
-            for row in saved
-            if row.part_of_speech == key
-        ]
-        for key in grouped_raw.keys()
-    }
+    entries = [VocabularyOut.from_orm_row(row) for row in saved]
+
+    grouped: dict[str, list[VocabularyOut]] = defaultdict(list)
+    for entry in entries:
+        grouped[entry.partOfSpeech].append(entry)
+
     return AnalyzeLyricsResponse(
         songId=payload.songId,
         cleanedLyrics=lyric.clean_text,
-        grouped=grouped,
+        grouped=dict(grouped),
         entries=entries,
     )
