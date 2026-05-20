@@ -15,8 +15,7 @@ import {
   type SongSummary,
 } from "@/lib/api";
 
-type ContextMenuView = "main" | "addToPlaylist";
-type ContextMenu = { x: number; y: number; song: SongSummary };
+type ContextMenu = { x: number; y: number; song: SongSummary; subLeft: boolean };
 type DeleteModal = { ids: number[]; title: string };
 
 export default function SongsPage() {
@@ -28,9 +27,7 @@ export default function SongsPage() {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
-  const [contextMenuView, setContextMenuView] = useState<ContextMenuView>("main");
-  const [addingToPlaylist, setAddingToPlaylist] = useState(false);
-  const [addToPlaylistMsg, setAddToPlaylistMsg] = useState<string | null>(null);
+  const [playlistSubmenuOpen, setPlaylistSubmenuOpen] = useState(false);
   const [deleteModal, setDeleteModal] = useState<DeleteModal | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [toolbarDropdownOpen, setToolbarDropdownOpen] = useState(false);
@@ -55,8 +52,7 @@ export default function SongsPage() {
 
   function closeContextMenu() {
     setContextMenu(null);
-    setContextMenuView("main");
-    setAddToPlaylistMsg(null);
+    setPlaylistSubmenuOpen(false);
   }
 
   // Close context menu on outside click or Escape
@@ -164,29 +160,21 @@ export default function SongsPage() {
   function handleContextMenu(e: React.MouseEvent, song: SongSummary) {
     e.preventDefault();
     if (!selectedIds.has(song.id)) setSelectedIds(new Set([song.id]));
-    setContextMenuView("main");
-    setAddToPlaylistMsg(null);
     const x = Math.min(e.clientX, window.innerWidth - 220);
-    const y = Math.min(e.clientY, window.innerHeight - 200);
-    setContextMenu({ x, y, song });
+    const y = Math.min(e.clientY, window.innerHeight - 160);
+    setContextMenu({ x, y, song, subLeft: x + 380 > window.innerWidth });
   }
 
   async function handleAddToPlaylist(playlistId: number) {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
-    setAddingToPlaylist(true);
-    setAddToPlaylistMsg(null);
+    closeContextMenu();
+    setToolbarDropdownOpen(false);
     try {
       await Promise.all(ids.map((id) => addSongToPlaylist(playlistId, id)));
-      const pl = playlists.find((p) => p.id === playlistId);
-      setAddToPlaylistMsg(`Added to "${pl?.name ?? "playlist"}"`);
       void refresh();
-      setTimeout(closeContextMenu, 1200);
     } catch (e) {
-      setAddToPlaylistMsg(e instanceof Error ? e.message : "Failed to add.");
-    } finally {
-      setAddingToPlaylist(false);
-      setToolbarDropdownOpen(false);
+      setLoadError(e instanceof Error ? e.message : "Failed to add to playlist.");
     }
   }
 
@@ -260,9 +248,8 @@ export default function SongsPage() {
                           <button
                             key={p.id}
                             type="button"
-                            disabled={addingToPlaylist}
                             onClick={() => handleAddToPlaylist(p.id)}
-                            className="w-full px-4 py-2 text-left text-sm transition hover:bg-white/5 disabled:opacity-50"
+                            className="w-full px-4 py-2 text-left text-sm transition hover:bg-white/5"
                           >
                             {p.name}
                           </button>
@@ -362,83 +349,67 @@ export default function SongsPage() {
         <div
           ref={menuRef}
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 min-w-[200px] overflow-hidden rounded-xl border border-white/10 bg-surface py-1 shadow-2xl"
+          className="fixed z-50 min-w-[200px] rounded-xl border border-white/10 bg-surface py-1 shadow-2xl"
         >
-          {contextMenuView === "main" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => router.push(`/analysis/${contextMenu.song.id}`)}
-                className="w-full px-4 py-2 text-left text-sm transition hover:bg-white/5"
+          <button
+            type="button"
+            onClick={() => router.push(`/analysis/${contextMenu.song.id}`)}
+            className="w-full px-4 py-2 text-left text-sm transition hover:bg-white/5"
+          >
+            View analysis
+          </button>
+          <div className="my-1 border-t border-white/10" />
+          <div
+            className="relative"
+            onMouseEnter={() => setPlaylistSubmenuOpen(true)}
+            onMouseLeave={() => setPlaylistSubmenuOpen(false)}
+          >
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-4 py-2 text-left text-sm transition hover:bg-white/5"
+            >
+              <span>Add to playlist</span>
+              <span className="text-xs text-textSecondary">›</span>
+            </button>
+            {playlistSubmenuOpen && (
+              <div
+                className={`absolute top-0 z-10 min-w-[160px] overflow-hidden rounded-xl border border-white/10 bg-surface py-1 shadow-2xl ${
+                  contextMenu.subLeft ? "right-full mr-1" : "left-full ml-1"
+                }`}
               >
-                View analysis
-              </button>
-              <div className="my-1 border-t border-white/10" />
-              <button
-                type="button"
-                onClick={() => setContextMenuView("addToPlaylist")}
-                className="flex w-full items-center justify-between px-4 py-2 text-left text-sm transition hover:bg-white/5"
-              >
-                <span>Add to playlist</span>
-                <span className="text-textSecondary">›</span>
-              </button>
-              <div className="my-1 border-t border-white/10" />
-              <button
-                type="button"
-                onClick={() =>
-                  openDeleteModal(
-                    selectedIds.size > 1
-                      ? [...selectedIds]
-                      : [contextMenu.song.id],
-                  )
-                }
-                className="w-full px-4 py-2 text-left text-sm text-red-400 transition hover:bg-white/5"
-              >
-                {selectedIds.size > 1 ? `Delete ${selectedIds.size} songs` : "Delete"}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setContextMenuView("main");
-                  setAddToPlaylistMsg(null);
-                }}
-                className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-sm text-textSecondary transition hover:bg-white/5"
-              >
-                <span>‹</span>
-                <span>Back</span>
-              </button>
-              <div className="my-1 border-t border-white/10" />
-              <p className="px-4 py-1 text-xs text-textSecondary">
-                {selectedIds.size > 1
-                  ? `Add ${selectedIds.size} songs to…`
-                  : "Add to playlist…"}
-              </p>
-              {addToPlaylistMsg ? (
-                <p className="px-4 py-2 text-xs text-green-400">{addToPlaylistMsg}</p>
-              ) : playlists.length === 0 ? (
-                <p className="px-4 py-2 text-xs text-textSecondary">
-                  No playlists yet. Create one first.
-                </p>
-              ) : (
-                <div className="max-h-52 overflow-y-auto">
-                  {playlists.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={addingToPlaylist}
-                      onClick={() => handleAddToPlaylist(p.id)}
-                      className="w-full px-4 py-2 text-left text-sm transition hover:bg-white/5 disabled:opacity-50"
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+                {playlists.length === 0 ? (
+                  <p className="px-4 py-2 text-xs text-textSecondary">
+                    No playlists yet
+                  </p>
+                ) : (
+                  <div className="max-h-52 overflow-y-auto">
+                    {playlists.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleAddToPlaylist(p.id)}
+                        className="w-full px-4 py-2 text-left text-sm transition hover:bg-white/5"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="my-1 border-t border-white/10" />
+          <button
+            type="button"
+            onClick={() =>
+              openDeleteModal(
+                selectedIds.size > 1 ? [...selectedIds] : [contextMenu.song.id],
+              )
+            }
+            className="w-full px-4 py-2 text-left text-sm text-red-400 transition hover:bg-white/5"
+          >
+            {selectedIds.size > 1 ? `Delete ${selectedIds.size} songs` : "Delete"}
+          </button>
         </div>
       )}
 
