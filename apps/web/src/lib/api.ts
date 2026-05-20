@@ -84,6 +84,7 @@ export type AuthUser = {
   id: number;
   email: string;
   display_name: string;
+  avatar_url: string | null;
   created_at: string;
 };
 
@@ -109,6 +110,20 @@ export async function login(payload: {
 
 export async function getMe(): Promise<AuthUser> {
   return apiGet<AuthUser>("/auth/me", "Failed to load profile");
+}
+
+export async function uploadAvatar(file: File): Promise<AuthUser> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await apiFetch("/auth/me/avatar", { method: "PATCH", body });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to upload avatar"));
+  return res.json() as Promise<AuthUser>;
+}
+
+export async function deleteAvatar(): Promise<AuthUser> {
+  const res = await apiFetch("/auth/me/avatar", { method: "DELETE" });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to remove avatar"));
+  return res.json() as Promise<AuthUser>;
 }
 
 /**

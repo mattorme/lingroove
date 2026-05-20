@@ -1,10 +1,12 @@
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.routes.analysis import router as analysis_router
@@ -18,6 +20,9 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Lingroove API", version="0.1.0")
+
+os.makedirs("uploads/avatars", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.exception_handler(Exception)

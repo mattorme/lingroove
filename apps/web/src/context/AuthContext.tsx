@@ -9,6 +9,7 @@ export type AuthUser = {
   id: number;
   email: string;
   display_name: string;
+  avatar_url: string | null;
   created_at: string;
 };
 
@@ -17,6 +18,7 @@ type AuthContextValue = {
   token: string | null;
   login: (token: string, user: AuthUser) => void;
   logout: () => void;
+  updateUser: (user: AuthUser) => void;
   loading: boolean;
 };
 
@@ -33,7 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
-    // Verify the stored token is still valid by hitting /auth/me
     fetch(`${API_BASE}/auth/me`, {
       headers: { Authorization: `Bearer ${stored}` },
     })
@@ -60,8 +61,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateUser = useCallback((updated: AuthUser) => {
+    setUser(updated);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
