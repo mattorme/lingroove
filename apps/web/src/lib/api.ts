@@ -167,8 +167,13 @@ export type SongSummary = {
   createdAt: string;
 };
 
-export async function listSongs(): Promise<{ songs: SongSummary[] }> {
-  return apiGet(`/songs`, "Failed to load songs");
+export function songSourceLabel(sourceType: string): string {
+  return sourceType === "url" ? "URL" : "Raw";
+}
+
+export async function listSongs(limit?: number): Promise<{ songs: SongSummary[] }> {
+  const path = limit !== undefined ? `/songs?limit=${limit}` : `/songs`;
+  return apiGet(path, "Failed to load songs");
 }
 
 // ---------------------------------------------------------------------------

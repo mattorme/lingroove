@@ -25,6 +25,9 @@ export function TopNav() {
               <Link href="/dashboard" className="hover:text-textPrimary">
                 Dashboard
               </Link>
+              <Link href="/songs" className="hover:text-textPrimary">
+                Songs
+              </Link>
               <Link href="/playlists" className="hover:text-textPrimary">
                 Playlists
               </Link>
