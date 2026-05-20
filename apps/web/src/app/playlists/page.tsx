@@ -81,7 +81,7 @@ export default function PlaylistsPage() {
                   className="block rounded-xl border border-white/10 bg-surfaceSoft px-3 py-2 transition hover:border-accent"
                 >
                   <span className="font-medium">{p.name}</span>
-                  <span className="mt-0.5 block text-xs text-textSecondary">{p.songCount} song(s)</span>
+                  <span className="mt-0.5 block text-xs text-textSecondary">{p.songCount} {p.songCount === 1 ? "song" : "songs"}</span>
                 </Link>
               </li>
             ))}

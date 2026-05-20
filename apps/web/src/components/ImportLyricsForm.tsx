@@ -78,12 +78,20 @@ export function ImportLyricsForm() {
   }
 
   return (
-    <form className="card space-y-3" onSubmit={onSubmit}>
-      <div className="flex gap-2">
-        <button type="button" className={isUrl ? "button-primary" : "button-secondary"} onClick={() => switchSourceType("url")}>
+    <form className="card space-y-4" onSubmit={onSubmit}>
+      <div className="inline-flex rounded-xl border border-white/10 bg-surfaceSoft p-1 text-sm">
+        <button
+          type="button"
+          onClick={() => switchSourceType("url")}
+          className={`rounded-lg px-4 py-1.5 transition ${isUrl ? "bg-accent font-medium text-white" : "text-textSecondary hover:text-textPrimary"}`}
+        >
           URL
         </button>
-        <button type="button" className={!isUrl ? "button-primary" : "button-secondary"} onClick={() => switchSourceType("raw")}>
+        <button
+          type="button"
+          onClick={() => switchSourceType("raw")}
+          className={`rounded-lg px-4 py-1.5 transition ${!isUrl ? "bg-accent font-medium text-white" : "text-textSecondary hover:text-textPrimary"}`}
+        >
           Raw Lyrics
         </button>
       </div>
