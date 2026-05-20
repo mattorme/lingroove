@@ -138,7 +138,7 @@ export default function ProfilePage() {
       <div className="flex justify-center">
         <button
           type="button"
-          className="rounded-full border border-red-500/50 px-8 py-2.5 text-base font-medium text-red-400 transition hover:border-red-500 hover:text-red-300"
+          className="rounded-full bg-red-500 px-8 py-2.5 text-base font-medium text-white transition hover:bg-red-600"
           onClick={onLogout}
         >
           Sign out
