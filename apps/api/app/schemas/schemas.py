@@ -74,9 +74,23 @@ class VocabularyOut(BaseModel):
     originalWord: str
     infinitiveForm: str | None
     englishTranslation: str
+    conjugatedTranslation: str | None = None
     contextSentence: str
     partOfSpeech: str
     isSelected: bool
+
+    @classmethod
+    def from_orm_row(cls, row: object) -> "VocabularyOut":
+        return cls(
+            id=row.id,
+            originalWord=row.original_word,
+            infinitiveForm=row.infinitive_form,
+            englishTranslation=row.english_translation,
+            conjugatedTranslation=row.conjugated_translation,
+            contextSentence=row.context_line,
+            partOfSpeech=row.part_of_speech,
+            isSelected=row.is_selected,
+        )
 
 
 class AnalyzeLyricsResponse(BaseModel):

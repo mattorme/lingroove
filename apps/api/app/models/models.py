@@ -53,6 +53,7 @@ class VocabularyEntry(Base):
     lemma: Mapped[str] = mapped_column(String(120))
     infinitive_form: Mapped[str | None] = mapped_column(String(120), nullable=True)
     english_translation: Mapped[str] = mapped_column(String(255))
+    conjugated_translation: Mapped[str | None] = mapped_column(String(255), nullable=True)
     context_line: Mapped[str] = mapped_column(Text)
     part_of_speech: Mapped[str] = mapped_column(String(20))
     is_selected: Mapped[bool] = mapped_column(Boolean, default=True)
