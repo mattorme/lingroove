@@ -44,6 +44,7 @@ class UserOut(BaseModel):
     id: int
     email: str
     display_name: str
+    avatar_url: str | None
     created_at: str
 
 
