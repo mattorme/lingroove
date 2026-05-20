@@ -1,5 +1,3 @@
-import os
-
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -7,10 +5,10 @@ from app.core.database import get_db
 from app.core.security import authenticate_user, create_access_token, get_current_user, hash_password
 from app.models.models import User
 from app.schemas.schemas import LoginRequest, SignupRequest, TokenResponse, UserOut
+from app.services import storage
 
 router = APIRouter()
 
-_AVATAR_DIR = "uploads/avatars"
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _MAX_AVATAR_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -65,14 +63,8 @@ async def upload_avatar(
     if len(contents) > _MAX_AVATAR_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB.")
 
-    ext = "jpg" if file.content_type == "image/jpeg" else file.content_type.split("/")[1]
-    filename = f"{current_user.id}.{ext}"
-
-    os.makedirs(_AVATAR_DIR, exist_ok=True)
-    with open(os.path.join(_AVATAR_DIR, filename), "wb") as f:
-        f.write(contents)
-
-    current_user.avatar_url = f"/uploads/avatars/{filename}"
+    avatar_url = storage.upload_avatar(current_user.id, file.content_type, contents)
+    current_user.avatar_url = avatar_url
     db.commit()
     db.refresh(current_user)
     return _user_out(current_user)
@@ -84,9 +76,7 @@ def delete_avatar(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.avatar_url:
-        path = current_user.avatar_url.lstrip("/")
-        if os.path.exists(path):
-            os.remove(path)
+        storage.delete_avatar(current_user.avatar_url)
         current_user.avatar_url = None
         db.commit()
         db.refresh(current_user)

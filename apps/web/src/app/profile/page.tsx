@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { deleteAvatar, uploadAvatar } from "@/lib/api";
-import { STATIC_BASE } from "@/lib/config";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -76,7 +75,7 @@ export default function ProfilePage() {
           <div className="relative h-24 w-24 overflow-hidden rounded-full ring-1 ring-white/10">
             {user.avatar_url ? (
               <Image
-                src={`${STATIC_BASE}${user.avatar_url}`}
+                src={user.avatar_url}
                 alt={user.display_name}
                 fill
                 className="object-cover"

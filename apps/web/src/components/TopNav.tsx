@@ -4,14 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { STATIC_BASE } from "@/lib/config";
 
 function UserAvatarCircle({ avatarUrl, displayName }: { avatarUrl: string | null; displayName: string }) {
   if (avatarUrl) {
     return (
       <div className="relative h-8 w-8 overflow-hidden rounded-full ring-1 ring-white/10">
         <Image
-          src={`${STATIC_BASE}${avatarUrl}`}
+          src={avatarUrl}
           alt={displayName}
           fill
           className="object-cover"
