@@ -13,4 +13,6 @@ build/
 coverage/
 apps/api/alembic.ini
 apps/api/alembic/versions/__pycache__/
+apps/api/uploads/avatars/*
+!apps/api/uploads/avatars/.gitkeep
 CLAUDE.md
