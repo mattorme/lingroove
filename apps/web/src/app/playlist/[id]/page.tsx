@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -146,9 +147,24 @@ export default function PlaylistPage() {
           <ul className="space-y-2">
             {data.songs.map((song) => (
               <li key={song.songId} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium">{song.title}</p>
-                  <p className="text-sm text-textSecondary">{song.artist || "Unknown artist"}</p>
+                <div className="flex items-center gap-3">
+                  {song.artworkUrl ? (
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md">
+                      <Image
+                        src={song.artworkUrl}
+                        alt={song.title}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-10 w-10 shrink-0 rounded-md bg-white/[0.06]" />
+                  )}
+                  <div>
+                    <p className="font-medium">{song.title}</p>
+                    <p className="text-sm text-textSecondary">{song.artist || "Unknown artist"}</p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Link href={`/analysis/${song.songId}`} className="button-secondary inline-block text-sm">

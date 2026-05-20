@@ -104,6 +104,7 @@ class SongSummary(BaseModel):
     id: int
     title: str
     artist: str | None
+    artworkUrl: str | None
     sourceType: str
     createdAt: str
 
@@ -136,6 +137,7 @@ class PlaylistSongOut(BaseModel):
     songId: int
     title: str
     artist: str | None
+    artworkUrl: str | None
 
 
 class PlaylistResponse(BaseModel):
@@ -151,6 +153,7 @@ class PlaylistSummary(BaseModel):
     name: str
     description: str | None
     songCount: int
+    artworkUrls: list[str]
 
 
 class PlaylistListResponse(BaseModel):

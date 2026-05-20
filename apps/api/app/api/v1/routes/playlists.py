@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func
@@ -61,9 +63,33 @@ def list_playlists(db: Session = Depends(get_db), current_user: User = Depends(g
         .order_by(Playlist.created_at.desc())
         .all()
     )
+
+    # Fetch up to 4 distinct artwork URLs per playlist in a single batched query.
+    playlist_ids = [p.id for p, _ in rows]
+    artwork_map: dict[int, list[str]] = defaultdict(list)
+    if playlist_ids:
+        artwork_rows = (
+            db.query(PlaylistSong.playlist_id, Song.artwork_url)
+            .join(Song, Song.id == PlaylistSong.song_id)
+            .filter(PlaylistSong.playlist_id.in_(playlist_ids))
+            .filter(Song.artwork_url.isnot(None))
+            .order_by(PlaylistSong.added_at.asc(), Song.id.asc())
+            .all()
+        )
+        for playlist_id, artwork_url in artwork_rows:
+            existing = artwork_map[playlist_id]
+            if len(existing) < 4 and artwork_url not in existing:
+                existing.append(artwork_url)
+
     return PlaylistListResponse(
         playlists=[
-            PlaylistSummary(id=p.id, name=p.name, description=p.description, songCount=count)
+            PlaylistSummary(
+                id=p.id,
+                name=p.name,
+                description=p.description,
+                songCount=count,
+                artworkUrls=artwork_map[p.id],
+            )
             for p, count in rows
         ]
     )
@@ -224,6 +250,6 @@ def get_playlist(
         id=playlist.id,
         name=playlist.name,
         description=playlist.description,
-        songs=[PlaylistSongOut(songId=s.id, title=s.title, artist=s.artist) for s, _ in rows],
+        songs=[PlaylistSongOut(songId=s.id, title=s.title, artist=s.artist, artworkUrl=s.artwork_url) for s, _ in rows],
         vocabularyCount=vocab_count or 0,
     )

@@ -16,12 +16,12 @@ def song_metadata_endpoint(
     url: str = Query(..., description="Lyrics page URL to extract metadata from"),
     _current_user: User = Depends(get_current_user),
 ):
-    """Return best-effort title and artist extracted from the given URL's page metadata."""
+    """Return best-effort title, artist, and artwork_url extracted from the given URL."""
     try:
-        title, artist = fetch_song_metadata(url)
+        title, artist, artwork_url = fetch_song_metadata(url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return {"title": title, "artist": artist}
+    return {"title": title, "artist": artist, "artworkUrl": artwork_url}
 
 
 @router.post("/import-lyrics", response_model=ImportLyricsResponse)
@@ -31,7 +31,7 @@ def import_lyrics_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        raw_text = import_lyrics(payload.sourceType, payload.sourceValue)
+        raw_text, artwork_url = import_lyrics(payload.sourceType, payload.sourceValue)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     cleaned = clean_lyrics(raw_text)
@@ -41,6 +41,7 @@ def import_lyrics_endpoint(
         artist=payload.artist,
         source_type=payload.sourceType,
         source_url=payload.sourceValue if payload.sourceType == "url" else None,
+        artwork_url=artwork_url,
     )
     db.add(song)
     db.flush()

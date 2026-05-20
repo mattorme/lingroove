@@ -1,9 +1,32 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { createPlaylist, listPlaylists, type PlaylistSummary } from "@/lib/api";
+
+function PlaylistArtwork({ urls }: { urls: string[] }) {
+  if (urls.length >= 4) {
+    return (
+      <div className="grid h-12 w-12 shrink-0 grid-cols-2 grid-rows-2 overflow-hidden rounded-lg">
+        {urls.slice(0, 4).map((url, i) => (
+          <div key={i} className="relative">
+            <Image src={url} alt="" fill className="object-cover" unoptimized />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (urls.length > 0) {
+    return (
+      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg">
+        <Image src={urls[0]} alt="" fill className="object-cover" unoptimized />
+      </div>
+    );
+  }
+  return <div className="h-12 w-12 shrink-0 rounded-lg bg-white/[0.06]" />;
+}
 
 export default function PlaylistsPage() {
   const { user, loading } = useRequireAuth();
@@ -78,10 +101,13 @@ export default function PlaylistsPage() {
               <li key={p.id}>
                 <Link
                   href={`/playlist/${p.id}`}
-                  className="block rounded-xl border border-white/10 bg-surfaceSoft px-3 py-2 transition hover:border-accent"
+                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-surfaceSoft px-3 py-2 transition hover:border-accent"
                 >
-                  <span className="font-medium">{p.name}</span>
-                  <span className="mt-0.5 block text-xs text-textSecondary">{p.songCount} {p.songCount === 1 ? "song" : "songs"}</span>
+                  <PlaylistArtwork urls={p.artworkUrls} />
+                  <div className="min-w-0">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="mt-0.5 block text-xs text-textSecondary">{p.songCount} {p.songCount === 1 ? "song" : "songs"}</span>
+                  </div>
                 </Link>
               </li>
             ))}

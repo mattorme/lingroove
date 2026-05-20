@@ -25,6 +25,7 @@ def list_songs(
                 id=s.id,
                 title=s.title,
                 artist=s.artist,
+                artworkUrl=s.artwork_url,
                 sourceType=s.source_type,
                 createdAt=s.created_at.isoformat() if s.created_at else "",
             )

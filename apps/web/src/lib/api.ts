@@ -135,7 +135,7 @@ export type ImportLyricsResponse = {
   detectedLanguage: string;
 };
 
-export async function fetchSongMetadata(url: string): Promise<{ title: string | null; artist: string | null }> {
+export async function fetchSongMetadata(url: string): Promise<{ title: string | null; artist: string | null; artworkUrl: string | null }> {
   return apiGet(`/song-metadata?url=${encodeURIComponent(url)}`, "Failed to fetch song metadata");
 }
 
@@ -163,6 +163,7 @@ export type SongSummary = {
   id: number;
   title: string;
   artist: string | null;
+  artworkUrl: string | null;
   sourceType: string;
   createdAt: string;
 };
@@ -189,6 +190,7 @@ export type PlaylistSummary = {
   name: string;
   description: string | null;
   songCount: number;
+  artworkUrls: string[];
 };
 
 export async function listPlaylists(): Promise<{ playlists: PlaylistSummary[] }> {
@@ -214,6 +216,7 @@ export type PlaylistSongRow = {
   songId: number;
   title: string;
   artist: string | null;
+  artworkUrl: string | null;
 };
 
 export type PlaylistDetail = {
