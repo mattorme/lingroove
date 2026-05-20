@@ -250,11 +250,32 @@ export async function generateAnkiCsv(songId: number, selectedVocabularyIds: num
   triggerBlobDownload(blob, "lingroove-anki.csv");
 }
 
+export async function generateAnkiPackage(songId: number, selectedVocabularyIds: number[]): Promise<void> {
+  const res = await apiFetch("/generate-anki-pkg", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ songId, selectedVocabularyIds }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to generate Anki package"));
+  const blob = await res.blob();
+  const filename = filenameFromContentDisposition(res.headers.get("Content-Disposition"), "lingroove.apkg");
+  triggerBlobDownload(blob, filename);
+}
+
 export async function exportPlaylistCsv(playlistId: number, playlistName: string): Promise<void> {
   const res = await apiFetch(`/playlist/${playlistId}/export-csv`);
   if (!res.ok) throw new Error(await parseError(res, "Failed to export playlist"));
   const blob = await res.blob();
   const slug = (playlistName.trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "playlist") + ".csv";
+  const filename = filenameFromContentDisposition(res.headers.get("Content-Disposition"), slug);
+  triggerBlobDownload(blob, filename);
+}
+
+export async function exportPlaylistAnkiPackage(playlistId: number, playlistName: string): Promise<void> {
+  const res = await apiFetch(`/playlist/${playlistId}/export-anki-pkg`);
+  if (!res.ok) throw new Error(await parseError(res, "Failed to export Anki package"));
+  const blob = await res.blob();
+  const slug = (playlistName.trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "playlist") + ".apkg";
   const filename = filenameFromContentDisposition(res.headers.get("Content-Disposition"), slug);
   triggerBlobDownload(blob, filename);
 }
