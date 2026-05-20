@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ImportLyricsForm } from "@/components/ImportLyricsForm";
@@ -76,12 +77,27 @@ export default function DashboardPage() {
             <ul className="divide-y divide-white/5">
               {songs.map((s) => (
                 <li key={s.id} className="py-2.5 first:pt-0 last:pb-0">
-                  <Link href={`/analysis/${s.id}`} className="block transition hover:text-accent">
-                    <span className="font-medium">{s.title}</span>
-                    {s.artist ? <span className="text-textSecondary"> · {s.artist}</span> : null}
-                    <span className="mt-0.5 block text-xs text-textSecondary">
-                      {songSourceLabel(s.sourceType)} · {new Date(s.createdAt).toLocaleString()}
-                    </span>
+                  <Link href={`/analysis/${s.id}`} className="flex items-center gap-3 transition hover:text-accent">
+                    {s.artworkUrl ? (
+                      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md">
+                        <Image
+                          src={s.artworkUrl}
+                          alt={s.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-9 w-9 shrink-0 rounded-md bg-white/[0.06]" />
+                    )}
+                    <div className="min-w-0">
+                      <span className="font-medium">{s.title}</span>
+                      {s.artist ? <span className="text-textSecondary"> · {s.artist}</span> : null}
+                      <span className="mt-0.5 block text-xs text-textSecondary">
+                        {songSourceLabel(s.sourceType)} · {new Date(s.createdAt).toLocaleString()}
+                      </span>
+                    </div>
                   </Link>
                 </li>
               ))}

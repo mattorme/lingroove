@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchSongMetadata, importLyrics } from "@/lib/api";
@@ -10,6 +11,7 @@ export function ImportLyricsForm() {
   const [sourceValue, setSourceValue] = useState("");
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
+  const [artwork, setArtwork] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [metadataResolved, setMetadataResolved] = useState(false);
@@ -21,6 +23,7 @@ export function ImportLyricsForm() {
 
     const url = sourceValue.trim();
     setMetadataResolved(false);
+    setArtwork(null);
 
     if (!url.startsWith("http://") && !url.startsWith("https://")) return;
 
@@ -31,6 +34,7 @@ export function ImportLyricsForm() {
         const meta = await fetchSongMetadata(url);
         if (meta.title) setTitle(meta.title);
         if (meta.artist) setArtist(meta.artist);
+        if (meta.artworkUrl) setArtwork(meta.artworkUrl);
       } catch {
         // Silently ignore — fields will be empty for the user to fill in
       } finally {
@@ -73,6 +77,7 @@ export function ImportLyricsForm() {
     setSourceValue("");
     setTitle("");
     setArtist("");
+    setArtwork(null);
     setMetadataResolved(false);
     setError(null);
   }
@@ -85,7 +90,7 @@ export function ImportLyricsForm() {
           onClick={() => switchSourceType("url")}
           className={`rounded-lg px-4 py-1.5 transition ${isUrl ? "bg-accent font-medium text-white" : "text-textSecondary hover:text-textPrimary"}`}
         >
-          URL
+          Genius URL
         </button>
         <button
           type="button"
@@ -99,7 +104,7 @@ export function ImportLyricsForm() {
         <div className="relative">
           <textarea
             className={`${inputClass} h-20`}
-            placeholder="Paste lyrics URL"
+            placeholder="Paste a genius.com URL"
             value={sourceValue}
             onChange={(e) => setSourceValue(e.target.value)}
             required
@@ -111,8 +116,29 @@ export function ImportLyricsForm() {
       )}
       {showMetaFields && (
         <>
-          <input className={inputClass} placeholder="Song title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <input className={inputClass} placeholder="Artist (optional)" value={artist} onChange={(e) => setArtist(e.target.value)} />
+          {artwork && (
+            <div className="flex items-center gap-4">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg">
+                <Image
+                  src={artwork}
+                  alt="Song artwork"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <input className={inputClass} placeholder="Song title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input className={inputClass} placeholder="Artist (optional)" value={artist} onChange={(e) => setArtist(e.target.value)} />
+              </div>
+            </div>
+          )}
+          {!artwork && (
+            <>
+              <input className={inputClass} placeholder="Song title" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <input className={inputClass} placeholder="Artist (optional)" value={artist} onChange={(e) => setArtist(e.target.value)} />
+            </>
+          )}
         </>
       )}
       {!isUrl && (

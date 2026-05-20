@@ -24,6 +24,7 @@ class Song(Base):
     source_type: Mapped[str] = mapped_column(String(20))
     source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     external_track_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    artwork_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     lyrics: Mapped[list["Lyric"]] = relationship(back_populates="song", cascade="all, delete-orphan")

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -234,21 +235,36 @@ export default function SongsPage() {
                 }`}
               >
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p>
-                      <Link
-                        href={`/analysis/${s.id}`}
-                        className="font-medium transition hover:text-accent"
-                      >
-                        {s.title}
-                      </Link>
-                      {s.artist ? (
-                        <span className="text-textSecondary"> · {s.artist}</span>
-                      ) : null}
-                    </p>
-                    <p className="mt-0.5 text-xs text-textSecondary">
-                      {songSourceLabel(s.sourceType)} · {new Date(s.createdAt).toLocaleString()}
-                    </p>
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    {s.artworkUrl ? (
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md">
+                        <Image
+                          src={s.artworkUrl}
+                          alt={s.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-10 w-10 shrink-0 rounded-md bg-white/[0.06]" />
+                    )}
+                    <div className="min-w-0">
+                      <p>
+                        <Link
+                          href={`/analysis/${s.id}`}
+                          className="font-medium transition hover:text-accent"
+                        >
+                          {s.title}
+                        </Link>
+                        {s.artist ? (
+                          <span className="text-textSecondary"> · {s.artist}</span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 text-xs text-textSecondary">
+                        {songSourceLabel(s.sourceType)} · {new Date(s.createdAt).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
                   <div className="shrink-0">
                     <AddToPlaylistMenu songId={s.id} onPlaylistsChanged={refresh} />
